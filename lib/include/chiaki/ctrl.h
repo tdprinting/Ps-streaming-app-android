@@ -38,6 +38,7 @@ typedef struct chiaki_ctrl_t
 	uint8_t *login_pin;
 	size_t login_pin_size;
 	ChiakiCtrlMessageQueue *msg_queue;
+	ChiakiStopPipe stop_pipe;
 	ChiakiStopPipe notif_pipe;
 	ChiakiMutex notif_mutex;
 
@@ -57,6 +58,8 @@ typedef struct chiaki_ctrl_t
 	uint64_t crypt_counter_local;
 	uint64_t crypt_counter_remote;
 	uint32_t keyboard_text_counter;
+	// when the last heartbeat reply was sent, 0 until the console first asks for one
+	uint64_t heartbeat_rep_last_ms;
 } ChiakiCtrl;
 
 CHIAKI_EXPORT ChiakiErrorCode chiaki_ctrl_init(ChiakiCtrl *ctrl, struct chiaki_session_t *session);

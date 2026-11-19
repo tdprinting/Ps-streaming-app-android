@@ -22,20 +22,27 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_audio_sender_init(ChiakiAudioSender *audio_
         return CHIAKI_ERR_MEMORY;
     audio_sender->filled_packet_buf = malloc(audio_sender->frame_buf_size + 20);
     if(!audio_sender->filled_packet_buf)
+    {
+        free(audio_sender->frame_buf);
+        audio_sender->frame_buf = NULL;
         return CHIAKI_ERR_MEMORY;
+    }
 
     ChiakiErrorCode err = chiaki_mutex_init(&audio_sender->mutex, false);
     if(err != CHIAKI_ERR_SUCCESS)
+    {
+        free(audio_sender->filled_packet_buf);
+        audio_sender->filled_packet_buf = NULL;
+        free(audio_sender->frame_buf);
+        audio_sender->frame_buf = NULL;
         return err;
+    }
 
     return CHIAKI_ERR_SUCCESS;
 }
 
 CHIAKI_EXPORT void chiaki_audio_sender_fini(ChiakiAudioSender *audio_sender)
 {
-#ifdef CHIAKI_LIB_ENABLE_OPUS
-	opus_encoder_destroy(audio_sender->opus_decoder);
-#endif
     free(audio_sender->frame_buf);
     free(audio_sender->filled_packet_buf);
     if(audio_sender->framea)
@@ -67,34 +74,28 @@ CHIAKI_EXPORT void chiaki_audio_sender_opus_data(ChiakiAudioSender *audio_sender
     if(is_ps5)
         ps5_packet = 1;
 
-    if(!audio_sender->frameb)
+    // Each packet carries the new frame, then the two before it, oldest first, so the console can
+    // fill a lost packet from the next one. The history starts as two copies of the first frame.
+    if(!audio_sender->framea || !audio_sender->frameb)
     {
-        audio_sender->frameb = malloc(audio_sender->buf_size_per_unit);
-        if(!audio_sender->frameb)
-        {
-            CHIAKI_LOGE(audio_sender->log, "Error allocating audio frameb");
-            return;
-        }
-        memcpy(audio_sender->frameb, opus_sender, opus_sender_size);
-        return;
-    }
-    if(!audio_sender->framea)
-    {
-        audio_sender->framea = malloc(audio_sender->buf_size_per_unit);
         if(!audio_sender->framea)
+            audio_sender->framea = malloc(audio_sender->buf_size_per_unit);
+        if(!audio_sender->frameb)
+            audio_sender->frameb = malloc(audio_sender->buf_size_per_unit);
+        if(!audio_sender->framea || !audio_sender->frameb)
         {
-            CHIAKI_LOGE(audio_sender->log, "Error allocating audio framea");
+            CHIAKI_LOGE(audio_sender->log, "Error allocating audio frame history");
             return;
         }
         memcpy(audio_sender->framea, opus_sender, opus_sender_size);
-        return;
+        memcpy(audio_sender->frameb, opus_sender, opus_sender_size);
     }
-    memcpy(audio_sender->frame_buf, audio_sender->frameb, audio_sender->buf_size_per_unit);
-    memcpy(audio_sender->frame_buf + audio_sender->buf_size_per_unit, audio_sender->framea, audio_sender->buf_size_per_unit);
-    memcpy(audio_sender->frame_buf + 2 * audio_sender->buf_size_per_unit, opus_sender, opus_sender_size);
+    // frameb is two frames back and framea one frame back
     memcpy(audio_sender->frame_buf, opus_sender, opus_sender_size);
-    memcpy(audio_sender->framea, opus_sender, opus_sender_size);
+    memcpy(audio_sender->frame_buf + audio_sender->buf_size_per_unit, audio_sender->frameb, audio_sender->buf_size_per_unit);
+    memcpy(audio_sender->frame_buf + 2 * audio_sender->buf_size_per_unit, audio_sender->framea, audio_sender->buf_size_per_unit);
     memcpy(audio_sender->frameb, audio_sender->framea, audio_sender->buf_size_per_unit);
+    memcpy(audio_sender->framea, opus_sender, opus_sender_size);
 
     uint32_t filled_packet_size = audio_sender->frame_buf_size + 19 + ps5_packet;
 
@@ -115,11 +116,22 @@ CHIAKI_EXPORT void chiaki_audio_sender_opus_data(ChiakiAudioSender *audio_sender
 
 static void chiaki_audio_sender_frame(ChiakiAudioSender *audio_sender, uint8_t *buf, size_t buf_size)
 {
-	chiaki_mutex_lock(&audio_sender->mutex);
-	chiaki_takion_send_mic_packet(audio_sender->takion, buf, buf_size, audio_sender->ps5);
-    if (audio_sender->frame_index == UINT16_MAX)
-        audio_sender->frame_index = 0;
-    else
-        audio_sender->frame_index++;
-    chiaki_mutex_unlock(&audio_sender->mutex);
+	ChiakiErrorCode err = chiaki_mutex_lock(&audio_sender->mutex);
+	if(err != CHIAKI_ERR_SUCCESS)
+	{
+		CHIAKI_LOGE(audio_sender->log, "Failed to lock audio sender mutex: %s", chiaki_error_string(err));
+		return;
+	}
+
+	err = chiaki_takion_send_mic_packet(audio_sender->takion, buf, buf_size, audio_sender->ps5);
+	if(err != CHIAKI_ERR_SUCCESS)
+		CHIAKI_LOGE(audio_sender->log, "Failed to send mic audio packet: %s", chiaki_error_string(err));
+
+	if(audio_sender->frame_index == UINT16_MAX)
+		audio_sender->frame_index = 0;
+	else
+		audio_sender->frame_index++;
+	err = chiaki_mutex_unlock(&audio_sender->mutex);
+	if(err != CHIAKI_ERR_SUCCESS)
+		CHIAKI_LOGE(audio_sender->log, "Failed to unlock audio sender mutex: %s", chiaki_error_string(err));
 }

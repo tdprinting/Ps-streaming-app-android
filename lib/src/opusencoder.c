@@ -32,6 +32,12 @@ CHIAKI_EXPORT void chiaki_opus_encoder_header(ChiakiAudioHeader *header, ChiakiO
 	memcpy(&encoder->audio_header, header, sizeof(encoder->audio_header));
 
 	opus_encoder_destroy(encoder->opus_encoder);
+	encoder->opus_encoder = NULL;
+	if(encoder->audio_sender)
+	{
+		chiaki_audio_sender_free(encoder->audio_sender);
+		encoder->audio_sender = NULL;
+	}
 	int error;
 	int application = OPUS_APPLICATION_RESTRICTED_LOWDELAY;
 	encoder->audio_sender = chiaki_audio_sender_new(encoder->log, session);
@@ -47,9 +53,20 @@ CHIAKI_EXPORT void chiaki_opus_encoder_header(ChiakiAudioHeader *header, ChiakiO
 	if(error != OPUS_OK)
 	{
 		CHIAKI_LOGE(encoder->log, "ChiakiOpusEncoder failed to initialize opus encoder: %s", opus_strerror(error));
+		chiaki_audio_sender_free(encoder->audio_sender);
+		encoder->audio_sender = NULL;
 		encoder->opus_encoder = NULL;
 		return;
 	}
+
+	// The sender only sends 40-byte frames, so encode at the constant bitrate that fills one
+	// exactly; with the default variable bitrate most quieter frames came out smaller and were dropped
+	opus_int32 bitrate = header->frame_size ? (opus_int32)(40 * 8 * header->rate / header->frame_size) : 32000;
+	if(opus_encoder_ctl(encoder->opus_encoder, OPUS_SET_BITRATE(bitrate)) != OPUS_OK
+		|| opus_encoder_ctl(encoder->opus_encoder, OPUS_SET_VBR(0)) != OPUS_OK
+		|| opus_encoder_ctl(encoder->opus_encoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_MUSIC)) != OPUS_OK
+		|| opus_encoder_ctl(encoder->opus_encoder, OPUS_SET_PHASE_INVERSION_DISABLED(1)) != OPUS_OK)
+		CHIAKI_LOGW(encoder->log, "ChiakiOpusEncoder failed to configure opus encoder");
 
 	CHIAKI_LOGI(encoder->log, "ChiakiOpusEncoder initialized");
 
@@ -64,6 +81,8 @@ CHIAKI_EXPORT void chiaki_opus_encoder_header(ChiakiAudioHeader *header, ChiakiO
 		CHIAKI_LOGE(encoder->log, "ChiakiOpusEncoder failed to alloc opus buffer");
 		opus_encoder_destroy(encoder->opus_encoder);
 		encoder->opus_encoder = NULL;
+		chiaki_audio_sender_free(encoder->audio_sender);
+		encoder->audio_sender = NULL;
 		encoder->opus_frame_buf_size = 0;
 		return;
 	}
@@ -82,6 +101,12 @@ CHIAKI_EXPORT void chiaki_opus_encoder_frame(int16_t *pcm_buf, ChiakiOpusEncoder
 	int r = opus_encode(encoder->opus_encoder, pcm_buf, encoder->audio_header.frame_size, encoder->opus_frame_buf, encoder->opus_frame_buf_size);
 	if(r < 1)
 		CHIAKI_LOGE(encoder->log, "Encoding audio frame with opus failed: %s", opus_strerror(r));
+	else if((size_t)r != encoder->opus_frame_buf_size)
+	{
+		CHIAKI_LOGV(encoder->log,
+			"Encoded audio frame with unexpected size %d, expected %zu; dropping packet as protocol violation",
+			r, encoder->opus_frame_buf_size);
+	}
 	else
 	{
 		chiaki_audio_sender_opus_data(encoder->audio_sender, encoder->opus_frame_buf, (size_t)r);

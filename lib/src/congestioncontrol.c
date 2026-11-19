@@ -7,6 +7,7 @@
 static void *congestion_control_thread_func(void *user)
 {
 	ChiakiCongestionControl *control = user;
+	chiaki_thread_set_affinity(CHIAKI_THREAD_NAME_CONGESTION);
 
 	ChiakiErrorCode err = chiaki_bool_pred_cond_lock(&control->stop_cond);
 	if(err != CHIAKI_ERR_SUCCESS)
@@ -34,7 +35,8 @@ static void *congestion_control_thread_func(void *user)
 		first = false;
 		if(control->packet_loss > control->packet_loss_max)
 		{
-			CHIAKI_LOGW(control->takion->log, "Increasing received packets to reduce hit on stream quality");
+			CHIAKI_LOGD(control->takion->log, "Clamping reported packet loss: measured=%.1f%% reported_max=%.1f%%",
+				control->packet_loss * 100.0, control->packet_loss_max * 100.0);
 			lost = total * control->packet_loss_max;
 			received = total - lost;
 		}
