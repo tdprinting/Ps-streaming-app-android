@@ -832,6 +832,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 				format(R.string.stream_stats_video, profile.width, profile.height, fps),
 			upscalingStats(),
 			format(R.string.stream_stats_network, stats.bitrateMbps, stats.packetLoss * 100f, stats.pingMs),
+			if(stats.kernelDrops > 0) format(R.string.stream_stats_kernel_drops, stats.kernelDrops) else null,
 			format(R.string.stream_stats_decode, stats.decodeMsAverage, stats.decodeMsMax),
 			format(R.string.stream_stats_timing, stats.frameGapMsMax, stats.audioBufferMs),
 			format(R.string.stream_stats_latency, decoderTierText(stats.decoderLatencyTier),

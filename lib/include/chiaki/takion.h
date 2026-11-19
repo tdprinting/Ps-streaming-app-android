@@ -125,6 +125,12 @@ typedef struct chiaki_takion_t
 	ChiakiLog *log;
 	uint8_t version;
 
+	// TS5: packets the kernel dropped because the socket's receive buffer was full, cumulative
+	// (SO_RXQ_OVFL). Read from other threads with __atomic_load_n.
+	uint32_t kernel_drops;
+	// TS5: packets read without waiting since the last wait, see takion_recv()
+	unsigned recv_streak;
+
 	// Whether or not audio or video is disabled from further processing beyond basic ack
 	ChiakiDisableAudioVideo disable_audio_video;
 	/**

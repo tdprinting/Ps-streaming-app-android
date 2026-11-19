@@ -778,7 +778,7 @@ JNIEXPORT void JNICALL JNI_FCN(sessionGetStats)(JNIEnv *env, jobject obj, jlong 
 	uint64_t lost_new = lost - session->stats_lost;
 	session->stats_received = received;
 	session->stats_lost = lost;
-	jfloat stats[12] = {
+	jfloat stats[13] = {
 		(jfloat)session->session.stream_connection.measured_bitrate,
 		received_new + lost_new > 0 ? (jfloat)lost_new / (jfloat)(received_new + lost_new) : 0.0f,
 		(jfloat)(session->session.rtt_us / 1000.0),
@@ -791,9 +791,10 @@ JNIEXPORT void JNICALL JNI_FCN(sessionGetStats)(JNIEnv *env, jobject obj, jlong 
 		(jfloat)__atomic_load_n(&decoder->frames_skipped_stale, __ATOMIC_RELAXED),
 		(jfloat)decoder->latency_tier,
 		(jfloat)(android_chiaki_audio_output_device_buffer_us(session->audio_output) / 1000.0),
-		android_chiaki_audio_output_exclusive(session->audio_output) ? 1.0f : 0.0f
+		android_chiaki_audio_output_exclusive(session->audio_output) ? 1.0f : 0.0f,
+		(jfloat)__atomic_load_n(&session->session.stream_connection.takion.kernel_drops, __ATOMIC_RELAXED)
 	};
-	E->SetFloatArrayRegion(env, stats_array, 0, 12, stats);
+	E->SetFloatArrayRegion(env, stats_array, 0, 13, stats);
 }
 
 JNIEXPORT void JNICALL JNI_FCN(setControllerOnly)(JNIEnv *env, jobject obj, jboolean enabled)

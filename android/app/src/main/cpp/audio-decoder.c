@@ -9,7 +9,9 @@
 
 #include <string.h>
 
-#define INPUT_BUFFER_TIMEOUT_MS 10
+// TS5: audio is fed on the same thread that receives the video packets, so a busy audio decoder
+// must not hold that thread up for long: a 2 ms wait at most, then the audio packet is skipped
+#define INPUT_BUFFER_TIMEOUT_MS 2
 
 static void *android_chiaki_audio_decoder_output_thread_func(void *user);
 static void android_chiaki_audio_decoder_header(ChiakiAudioHeader *header, void *user);
@@ -187,7 +189,8 @@ static void android_chiaki_audio_decoder_frame(uint8_t *buf, size_t buf_size, vo
 		if(codec_buf_index < 0)
 		{
 			CHIAKI_LOGE(decoder->log, "Failed to get input audio buffer");
-			return;
+			// TS5: leave through beach, which unlocks codec_mutex (this returned with it held)
+			goto beach;
 		}
 
 		size_t codec_buf_size;

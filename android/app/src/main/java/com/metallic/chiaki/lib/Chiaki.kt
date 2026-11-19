@@ -503,7 +503,9 @@ data class StreamStats(
 	/** TS5: the audio device's own buffer, in ms */
 	val audioDeviceBufferMs: Float = 0f,
 	/** TS5: whether the audio stream skips Android's mixer (AAudio exclusive / MMAP) */
-	val audioExclusive: Boolean = false
+	val audioExclusive: Boolean = false,
+	/** TS5: packets the kernel dropped because the socket's buffer was full, since connecting */
+	val kernelDrops: Long = 0
 )
 
 /** TS5: latency options that apply to sessions created from now on */
@@ -657,10 +659,10 @@ class Session(connectInfo: ConnectInfo, logFile: String?, logVerbose: Boolean,
 
 	fun getStats(): StreamStats?
 	{
-		val stats = FloatArray(12)
+		val stats = FloatArray(13)
 		withNative { ChiakiNative.sessionGetStats(it, stats) } ?: return null
 		return StreamStats(stats[0], stats[1], stats[2], stats[3].toLong(), stats[4], stats[5], stats[6], stats[7],
-			stats[8].toLong(), stats[9].toInt(), stats[10], stats[11] != 0f)
+			stats[8].toLong(), stats[9].toInt(), stats[10], stats[11] != 0f, stats[12].toLong())
 	}
 
 	/**

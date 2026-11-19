@@ -36,6 +36,12 @@
 // VERY similar to SCTP, see RFC 4960
 
 #define TAKION_A_RWND 0x19000
+// TS5: the kernel buffer for incoming packets. 100 KB (a_rwnd) holds less than one keyframe at
+// 40 Mbit/s, so any pause of the receive thread during a burst made the kernel drop packets.
+// Linux caps it at net.core.rmem_max; the size it really got is logged.
+#define TAKION_SOCKET_RCVBUF (4 * 1024 * 1024)
+// TS5: packets read without waiting before checking the stop pipe again
+#define TAKION_RECV_STREAK_MAX 64
 #define TAKION_OUTBOUND_STREAMS 0x64
 #define TAKION_INBOUND_STREAMS 0x64
 
@@ -177,6 +183,22 @@ static ChiakiErrorCode takion_recv_message_cookie_ack(ChiakiTakion *takion);
 static void takion_handle_packet_av(ChiakiTakion *takion, uint8_t base_type, uint8_t *buf, size_t buf_size);
 static ChiakiErrorCode takion_read_extra_sock_messages(ChiakiTakion *takion);
 
+/** TS5: logs the receive buffer the kernel granted, and asks it to count drops (Linux) */
+static void takion_log_rcvbuf(ChiakiTakion *takion)
+{
+#if defined(__linux__) || defined(__ANDROID__)
+	int granted = 0;
+	socklen_t len = sizeof(granted);
+	if(getsockopt(takion->sock, SOL_SOCKET, SO_RCVBUF, &granted, &len) == 0)
+		CHIAKI_LOGI(takion->log, "Takion socket receive buffer: %d KB", granted / 1024);
+	const int one = 1;
+	if(setsockopt(takion->sock, SOL_SOCKET, SO_RXQ_OVFL, &one, sizeof(one)) < 0)
+		CHIAKI_LOGW(takion->log, "Takion can't count dropped packets: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
+#else
+	(void)takion;
+#endif
+}
+
 #if defined(__ANDROID__)
 #include <netinet/in.h>
 /**
@@ -244,6 +266,8 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 	takion->cb = info->cb;
 	takion->cb_user = info->cb_user;
 	takion->a_rwnd = TAKION_A_RWND;
+	takion->kernel_drops = 0;
+	takion->recv_streak = 0;
 
 	takion->tag_local = chiaki_random_32(); // 0x4823
 	takion->seq_num_local = takion->tag_local;
@@ -277,8 +301,10 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 			CHIAKI_LOGE(takion->log, "Takion had problem reading extra messages from socket using PSN Connection with error: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
 			goto error_sock;
 		}
-		const int rcvbuf_val = takion->a_rwnd;
+		// TS5: the socket's own buffer, apart from the window advertised to the console (a_rwnd)
+		const int rcvbuf_val = TAKION_SOCKET_RCVBUF;
 		int r = setsockopt(takion->sock, SOL_SOCKET, SO_RCVBUF, (const CHIAKI_SOCKET_BUF_TYPE)&rcvbuf_val, sizeof(rcvbuf_val));
+		takion_log_rcvbuf(takion);
 		if(r < 0)
 		{
 			CHIAKI_LOGE(takion->log, "Takion failed to setsockopt SO_RCVBUF: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
@@ -365,8 +391,10 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 			ret = CHIAKI_ERR_NETWORK;
 			goto error_pipe;
 		}
-		const int rcvbuf_val = takion->a_rwnd;
+		// TS5: the socket's own buffer, apart from the window advertised to the console (a_rwnd)
+		const int rcvbuf_val = TAKION_SOCKET_RCVBUF;
 		int r = setsockopt(takion->sock, SOL_SOCKET, SO_RCVBUF, (const CHIAKI_SOCKET_BUF_TYPE)&rcvbuf_val, sizeof(rcvbuf_val));
+		takion_log_rcvbuf(takion);
 		if(r < 0)
 		{
 			CHIAKI_LOGE(takion->log, "Takion failed to setsockopt SO_RCVBUF: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
@@ -1062,6 +1090,62 @@ beach:
 
 static ChiakiErrorCode takion_recv(ChiakiTakion *takion, uint8_t *buf, size_t *buf_size, uint64_t timeout_ms)
 {
+#if defined(__linux__) || defined(__ANDROID__)
+	// TS5: during a burst (a frame is dozens of packets) the next packet is usually waiting
+	// already, so try reading it straight away and only wait in select() when there is none.
+	// That halves the system calls per packet and skips the wake-up in between. The stop pipe is
+	// still checked at least every TAKION_RECV_STREAK_MAX packets.
+	bool try_now = takion->recv_streak < TAKION_RECV_STREAK_MAX;
+	for(int attempt = try_now ? 0 : 1; attempt < 2; attempt++)
+	{
+		if(attempt == 1)
+		{
+			takion->recv_streak = 0;
+			ChiakiErrorCode err = chiaki_stop_pipe_select_single(&takion->stop_pipe, takion->sock, false, timeout_ms);
+			if(err == CHIAKI_ERR_TIMEOUT || err == CHIAKI_ERR_CANCELED)
+				return err;
+			if(err != CHIAKI_ERR_SUCCESS)
+			{
+				CHIAKI_LOGE(takion->log, "Takion select failed: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
+				return err;
+			}
+		}
+		struct iovec iov = { .iov_base = buf, .iov_len = *buf_size };
+		union { char buf[CMSG_SPACE(sizeof(uint32_t))]; struct cmsghdr align; } control;
+		struct msghdr msg = { 0 };
+		msg.msg_iov = &iov;
+		msg.msg_iovlen = 1;
+		msg.msg_control = control.buf;
+		msg.msg_controllen = sizeof(control.buf);
+		ssize_t received_sz = recvmsg(takion->sock, &msg, attempt == 0 ? MSG_DONTWAIT : 0);
+		if(received_sz < 0 && attempt == 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+			continue; // nothing waiting: wait for it
+		if(received_sz <= 0)
+		{
+			if(received_sz < 0)
+				CHIAKI_LOGE(takion->log, "Takion recv failed: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
+			else
+				CHIAKI_LOGE(takion->log, "Takion recv returned 0");
+			return CHIAKI_ERR_NETWORK;
+		}
+		for(struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg))
+		{
+			if(cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SO_RXQ_OVFL)
+			{
+				uint32_t drops;
+				memcpy(&drops, CMSG_DATA(cmsg), sizeof(drops));
+				uint32_t before = __atomic_exchange_n(&takion->kernel_drops, drops, __ATOMIC_RELAXED);
+				if(drops > before)
+					CHIAKI_LOGW(takion->log, "Takion: the kernel dropped %u packets (receive buffer full)", (unsigned)(drops - before));
+			}
+		}
+		if(attempt == 0)
+			takion->recv_streak++;
+		*buf_size = (size_t)received_sz;
+		return CHIAKI_ERR_SUCCESS;
+	}
+	return CHIAKI_ERR_NETWORK;
+#else
 	ChiakiErrorCode err = chiaki_stop_pipe_select_single(&takion->stop_pipe, takion->sock, false, timeout_ms);
 	if(err == CHIAKI_ERR_TIMEOUT || err == CHIAKI_ERR_CANCELED)
 		return err;
@@ -1082,6 +1166,7 @@ static ChiakiErrorCode takion_recv(ChiakiTakion *takion, uint8_t *buf, size_t *b
 	}
 	*buf_size = (size_t)received_sz;
 	return CHIAKI_ERR_SUCCESS;
+#endif
 }
 
 static ChiakiErrorCode takion_handle_packet_mac(ChiakiTakion *takion, uint8_t base_type, uint8_t *buf, size_t buf_size)
