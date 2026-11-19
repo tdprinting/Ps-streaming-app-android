@@ -147,6 +147,14 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			viewModel.setOnScreenControlsEnabled(isChecked)
 			showOverlay()
 		}
+		// TS5: on-screen controls layout editor
+		binding.editControlsButton.setOnClickListener {
+			if(!binding.onScreenControlsSwitch.isChecked)
+				binding.onScreenControlsSwitch.isChecked = true
+			hideOverlay()
+			(supportFragmentManager.findFragmentById(R.id.controlsFragment) as? com.metallic.chiaki.touchcontrols.TouchControlsFragment)
+				?.startEditing()
+		}
 		binding.statsSwitch.isChecked = Preferences(this).streamStatsEnabled
 		binding.statsSwitch.setOnCheckedChangeListener { _, isChecked ->
 			setStatsVisible(isChecked)

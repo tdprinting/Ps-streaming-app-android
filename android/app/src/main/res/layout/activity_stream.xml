@@ -177,6 +177,18 @@
                 android:layout_marginStart="24dp"
                 android:textColor="@color/stream_text"/>
 
+            <!-- TS5: move, resize and hide the on-screen controls -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/editControlsButton"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:layout_constraintStart_toEndOf="@id/statsSwitch"
+                app:layout_constraintBottom_toBottomOf="parent"
+                android:layout_marginStart="16dp"
+                android:text="@string/stream_edit_controls"
+                android:textColor="@color/stream_text" />
+
 
             <com.google.android.material.button.MaterialButtonToggleGroup
                 android:id="@+id/displayModeToggle"

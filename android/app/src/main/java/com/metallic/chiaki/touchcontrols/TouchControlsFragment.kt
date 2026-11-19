@@ -40,6 +40,9 @@ abstract class TouchControlsFragment : Fragment()
 
 	/** A double tap beside the controls */
 	var onBackgroundDoubleTap: (() -> Unit)? = null
+
+	/** TS5: lets the user move, resize and hide the controls, until Done */
+	open fun startEditing() {}
 }
 
 class DefaultTouchControlsFragment : TouchControlsFragment()
@@ -93,6 +96,173 @@ class DefaultTouchControlsFragment : TouchControlsFragment()
 		onScreenControlsEnabled?.observe(viewLifecycleOwner, Observer {
 			view.visibility = if(it) View.VISIBLE else View.GONE
 		})
+
+		// TS5: the user's own layout, applied whenever the screen's size changes
+		view.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+			if(right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop)
+				applyLayout()
+		}
+	}
+
+	// ── TS5 layout editor ────────────────────────────────────────────────────────────────────
+
+	private val touchLayout by lazy { TouchLayout(requireContext()) }
+	private var editor: LayoutEditorOverlay? = null
+	private var editorBar: android.widget.LinearLayout? = null
+
+	/** The controls that can be moved, by the key their placement is saved under */
+	private fun editableControls(): List<Pair<String, View>> = listOf(
+		"touchpad" to binding.touchpadView,
+		"left_stick" to binding.leftAnalogStickView,
+		"right_stick" to binding.rightAnalogStickView,
+		"dpad" to binding.dpadView,
+		"face_buttons" to binding.faceButtonsLayout,
+		"l1" to binding.l1ButtonView,
+		"l2" to binding.l2ButtonView,
+		"r1" to binding.r1ButtonView,
+		"r2" to binding.r2ButtonView,
+		"l3" to binding.l3ButtonView,
+		"r3" to binding.r3ButtonView,
+		"share" to binding.shareButtonView,
+		"options" to binding.optionsButtonView,
+		"ps" to binding.psButtonView)
+
+	private fun applyLayout()
+	{
+		val root = _binding?.root ?: return
+		val w = root.width.toFloat()
+		val h = root.height.toFloat()
+		val editing = editor != null
+		for((key, view) in editableControls())
+		{
+			val p = touchLayout.placement(key)
+			view.translationX = p.x * w
+			view.translationY = p.y * h
+			view.scaleX = p.scale
+			view.scaleY = p.scale
+			view.visibility = if(p.hidden && !editing) View.INVISIBLE else View.VISIBLE
+			view.alpha = if(p.hidden) 0.25f else touchLayout.opacity
+		}
+	}
+
+	override fun startEditing()
+	{
+		if(editor != null)
+			return
+		val root = _binding?.root as? ViewGroup ?: return
+		val context = requireContext()
+		val overlay = LayoutEditorOverlay(context,
+			controls = ::editableControls,
+			onSelect = { updateBar() },
+			onMove = { key, _, dx, dy ->
+				val p = touchLayout.placement(key)
+				touchLayout.placements[key] = p.copy(x = p.x + dx / root.width, y = p.y + dy / root.height)
+				applyLayout()
+			},
+			onScale = { key, _, factor -> scaleSelected(key, factor) },
+			onGestureEnd = { touchLayout.save() })
+		root.addView(overlay, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+		editor = overlay
+
+		val bar = android.widget.LinearLayout(context).apply {
+			orientation = android.widget.LinearLayout.HORIZONTAL
+			setBackgroundResource(com.metallic.chiaki.R.drawable.stream_stats_background)
+			val pad = (8 * resources.displayMetrics.density).toInt()
+			setPadding(pad, pad / 2, pad, pad / 2)
+		}
+		fun button(text: Int, action: () -> Unit) = com.google.android.material.button.MaterialButton(context,
+			null, com.google.android.material.R.attr.materialButtonOutlinedStyle).also {
+			it.setText(text)
+			it.setTextColor(0xFFFFFFFF.toInt())
+			it.setOnClickListener { action() }
+			bar.addView(it)
+		}
+		button(com.metallic.chiaki.R.string.touch_edit_hide) { toggleHidden() }
+		button(com.metallic.chiaki.R.string.touch_edit_smaller) { overlay.selectedKey?.let { scaleSelected(it, 0.9f) } }
+		button(com.metallic.chiaki.R.string.touch_edit_bigger) { overlay.selectedKey?.let { scaleSelected(it, 1.1f) } }
+		button(com.metallic.chiaki.R.string.touch_edit_opacity) { cycleOpacity() }
+		button(com.metallic.chiaki.R.string.touch_edit_reset) {
+			touchLayout.reset()
+			overlay.selectedKey = null
+			applyLayout()
+			updateBar()
+			overlay.invalidate()
+		}
+		button(com.metallic.chiaki.R.string.touch_edit_done) { stopEditing() }
+		root.addView(bar, androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
+			ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+			topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+			startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+			endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID
+			topMargin = (12 * resources.displayMetrics.density).toInt()
+		})
+		editorBar = bar
+		view?.visibility = View.VISIBLE
+		applyLayout()
+		updateBar()
+		android.widget.Toast.makeText(context, com.metallic.chiaki.R.string.touch_edit_hint, android.widget.Toast.LENGTH_LONG).show()
+	}
+
+	private fun stopEditing()
+	{
+		val root = _binding?.root as? ViewGroup ?: return
+		editor?.let { root.removeView(it) }
+		editorBar?.let { root.removeView(it) }
+		editor = null
+		editorBar = null
+		touchLayout.save()
+		applyLayout()
+		onScreenControlsEnabled?.value?.let { view?.visibility = if(it) View.VISIBLE else View.GONE }
+	}
+
+	private fun scaleSelected(key: String, factor: Float)
+	{
+		val p = touchLayout.placement(key)
+		touchLayout.placements[key] = p.copy(scale = (p.scale * factor).coerceIn(TouchLayout.MIN_SCALE, TouchLayout.MAX_SCALE))
+		applyLayout()
+		editor?.invalidate()
+		touchLayout.save()
+	}
+
+	private fun toggleHidden()
+	{
+		val key = editor?.selectedKey ?: return
+		val p = touchLayout.placement(key)
+		touchLayout.placements[key] = p.copy(hidden = !p.hidden)
+		touchLayout.save()
+		applyLayout()
+		updateBar()
+	}
+
+	private fun cycleOpacity()
+	{
+		val steps = TouchLayout.OPACITY_STEPS
+		val i = steps.indexOfFirst { kotlin.math.abs(it - touchLayout.opacity) < 0.01f }
+		touchLayout.opacity = steps[(i + 1) % steps.size]
+		applyLayout()
+		updateBar()
+	}
+
+	/** The Hide button says Show for a hidden control, the Opacity button shows the level */
+	private fun updateBar()
+	{
+		val bar = editorBar ?: return
+		val hide = bar.getChildAt(0) as? com.google.android.material.button.MaterialButton
+		val key = editor?.selectedKey
+		hide?.isEnabled = key != null
+		hide?.setText(if(key != null && touchLayout.placement(key).hidden)
+			com.metallic.chiaki.R.string.touch_edit_show else com.metallic.chiaki.R.string.touch_edit_hide)
+		bar.getChildAt(1)?.isEnabled = key != null
+		bar.getChildAt(2)?.isEnabled = key != null
+		(bar.getChildAt(3) as? com.google.android.material.button.MaterialButton)?.text =
+			getString(com.metallic.chiaki.R.string.touch_edit_opacity_value, (touchLayout.opacity * 100).toInt())
+	}
+
+	override fun onDestroyView()
+	{
+		editor = null
+		editorBar = null
+		super.onDestroyView()
 	}
 
 	private fun dpadStateChanged(direction: DPadView.Direction?)

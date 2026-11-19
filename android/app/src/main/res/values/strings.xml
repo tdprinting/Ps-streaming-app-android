@@ -481,6 +481,16 @@
     <string name="setup_check_summary_good">Everything looks ready for the lowest delay.</string>
     <string name="setup_check_summary_warn">%1$d things could lower your delay or improve the picture.</string>
     <string name="setup_check_summary_bad">%1$d things are likely adding delay. See below.</string>
+    <string name="stream_edit_controls">Edit layout</string>
+    <string name="touch_edit_hint">Drag a control to move it, pinch to resize it. Tap Done when you\'re finished.</string>
+    <string name="touch_edit_hide">Hide</string>
+    <string name="touch_edit_show">Show</string>
+    <string name="touch_edit_smaller">Smaller</string>
+    <string name="touch_edit_bigger">Bigger</string>
+    <string name="touch_edit_opacity">Opacity</string>
+    <string name="touch_edit_opacity_value">Opacity %1$d%%</string>
+    <string name="touch_edit_reset">Reset</string>
+    <string name="touch_edit_done">Done</string>
     <string name="stream_stats_latency" translatable="false">Decoder: %1$s · %2$d stale frames skipped · display %3$.0f Hz</string>
     <string name="stream_stats_decoder_snapdragon">Snapdragon low latency</string>
     <string name="stream_stats_decoder_low_latency">low latency</string>
