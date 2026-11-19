@@ -44,8 +44,8 @@
 - [ ] Measure end to end delay with a 240 fps phone camera (button LED or on-screen counter) against Momiji and Sony's app, and record the results in `docs/LATENCY.md`
 - [ ] Test direct input on a rooted Odin 2 Portal (button and axis mapping)
 - [x] On-screen controller layout editor (stream menu → Edit layout)
-- [ ] ADPF performance hint session for the decode and input threads (Android 13 `APerformanceHint`)
-- [ ] Odin preset button: one tap for all latency settings plus the Max quality preset
+- [x] ADPF performance hint session for the decode thread (Android 13 `APerformanceHint`)
+- [x] Odin preset button: setup check → Apply best settings
 - [ ] Optional: the decoder's own frame-ready callback (async MediaCodec) in place of the blocking output thread
 - [ ] Check whether the Odin 2 Portal reports HDR10 to Android (stats overlay), and measure the decode cost of HDR
 - [x] HDR-capable shader path (10-bit BT.2020 PQ surface, half float passes), setting **HDR shaders**
@@ -53,4 +53,5 @@
 - [ ] Verify tearing mode on the Odin 2 Portal (does its display stack support front buffer usage?)
 - [ ] Research: per-game "camera warp" reprojection from the right stick, calibrated by hand (novelty, artifacts expected)
 - [ ] Research: optional 60→120 fps frame *extrapolation* for smoothness only (never interpolation, which adds a frame of delay)
-- [ ] Regularly merge upstream Momiji releases
+- [x] Merge chiaki-ng's 2026 protocol fixes (November 2026, chiaki-ng 43728af): input numbering and resends, 1024-packet resend buffer, IDR re-requests, reorder queue and corrupt-frame crash fixes, degraded network hardening. Left out: the video reorder queue's 16 ms wait (off, `chiaki_takion_set_video_reorder`), the audio jitter buffer (+20–30 ms), PSN holepunch rework (needs libevent)
+- [ ] Regularly merge upstream Momiji and chiaki-ng releases (last checked November 2026: Momiji v1.1.3, chiaki-ng 43728af)
