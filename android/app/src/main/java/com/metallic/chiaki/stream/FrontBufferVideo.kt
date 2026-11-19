@@ -107,6 +107,8 @@ class FrontBufferVideo(
 	private val frameThread = HandlerThread("TS5 front buffer", Process.THREAD_PRIORITY_URGENT_DISPLAY).also { it.start() }
 
 	private var texture = 0
+	private var setupFailed = false
+	private val pendingFrames = java.util.concurrent.atomic.AtomicInteger(0)
 	private var program = 0
 	private var posLocation = 0
 	private var uvLocation = 0
@@ -126,11 +128,22 @@ class FrontBufferVideo(
 		override fun onDrawFrontBufferedLayer(eglManager: EGLManager, width: Int, height: Int,
 			bufferInfo: BufferInfo, transform: FloatArray, param: Unit)
 		{
-			if(program == 0 && !setUpGl())
-				return
+			if(program == 0)
+			{
+				// One attempt: a failed one would otherwise repeat every frame, leaking a texture each time
+				if(setupFailed || !setUpGl())
+				{
+					setupFailed = true
+					return
+				}
+			}
+			// Every frame queued since the last draw, so the decoder never runs out of buffers
+			val pending = pendingFrames.getAndSet(0)
+			if(pending == 0)
+				return // the front buffer still shows the last frame
 			try
 			{
-				surfaceTexture.updateTexImage()
+				repeat(pending) { surfaceTexture.updateTexImage() }
 			}
 			catch(e: RuntimeException)
 			{
@@ -172,7 +185,10 @@ class FrontBufferVideo(
 
 	init
 	{
-		surfaceTexture.setOnFrameAvailableListener({ renderer.renderFrontBufferedLayer(Unit) },
+		surfaceTexture.setOnFrameAvailableListener({
+			pendingFrames.incrementAndGet()
+			renderer.renderFrontBufferedLayer(Unit)
+		},
 			Handler(frameThread.looper))
 		onSurface(surface)
 	}

@@ -434,6 +434,8 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 
 	/** TS5: this device couldn't draw HDR through the shaders, so this stream uses the plain path */
 	private var hdrShadersFailed = false
+	/** The renderer the HDR fallback left, released with the activity */
+	private var abandonedRenderer: VideoRenderer? = null
 
 	private fun fallBackFromHdrShaders()
 	{
@@ -442,6 +444,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		hdrShadersFailed = true
 		android.widget.Toast.makeText(this, R.string.stream_hdr_shaders_unavailable, android.widget.Toast.LENGTH_LONG).show()
 		// The GL view keeps its renderer, it's only hidden; the video moves to the plain SurfaceView
+		abandonedRenderer = videoRenderer
 		videoRenderer = null
 		setupVideoOutput()
 	}
@@ -553,10 +556,15 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 	/** TS5 direct input, see [RootInput] */
 	private var rootInput: RootInput? = null
 	private var rootInputStarting: Thread? = null
+	/** Between onResume and onPause: a start that finishes after onPause is thrown away */
+	private var directInputWanted = false
 
 	private fun startDirectInput()
 	{
-		if(!Preferences(this).directInput || rootInput != null || rootInputStarting != null)
+		if(!Preferences(this).directInput)
+			return
+		directInputWanted = true
+		if(rootInput != null || rootInputStarting != null)
 			return
 		val input = viewModel.input
 		rootInputStarting = Thread {
@@ -574,25 +582,39 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 				.mapNotNull { InputDevice.getDevice(it) }
 				.firstOrNull { it.name == device.name }
 			val profile = ControllerProfiles(this).profile(androidDevice?.descriptor)
-			val started = RootInput.start(device, profile.swapFaceButtons, profile.stickDeadZone / 100f) {
+			var started: RootInput? = null
+			started = RootInput.start(device, profile.swapFaceButtons, profile.stickDeadZone / 100f,
+				onEnded = { runOnUiThread { directInputEnded(started) } }) {
 				input.setRawControllerState(it)
 			}
 			runOnUiThread {
 				rootInputStarting = null
-				if(started == null || isFinishing)
+				if(started == null || isFinishing || !directInputWanted)
 				{
 					started?.stop()
 					return@runOnUiThread
 				}
 				rootInput = started
 				input.setRawDevice(device.name)
+				// The controller was handled by Android until now: let go of what it held
+				input.releaseAll()
 				viewModel.session.logInfo("Direct input from ${device.path} (${device.name})")
 			}
 		}.also { it.start() }
 	}
 
+	/** Reading stopped by itself (root revoked, device gone): back to Android's input */
+	private fun directInputEnded(input: RootInput?)
+	{
+		if(input == null || input !== rootInput)
+			return
+		stopDirectInput()
+		android.widget.Toast.makeText(this, R.string.direct_input_unavailable, android.widget.Toast.LENGTH_LONG).show()
+	}
+
 	private fun stopDirectInput()
 	{
+		directInputWanted = false
 		rootInput?.stop()
 		rootInput = null
 		viewModel.input.setRawDevice(null)
@@ -825,6 +847,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 	// TS5: Moonlight-style poor connection warning. Shown after two bad seconds in a row (over 5%
 	// packet loss, or frames 100 ms or more apart), hidden after three good ones.
 	private var badConnectionSeconds = 0
+	private var connectionWarningHiding = false
 	private var goodConnectionSeconds = 0
 	private val checkConnectionRunnable: Runnable = object: Runnable
 	{
@@ -835,13 +858,22 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 				if(bad) { badConnectionSeconds++; goodConnectionSeconds = 0 }
 				else { goodConnectionSeconds++; badConnectionSeconds = 0 }
 				val warning = binding.connectionWarning
-				if(badConnectionSeconds >= 2 && !warning.isVisible)
+				if(badConnectionSeconds >= 2 && (!warning.isVisible || connectionWarningHiding))
 				{
+					connectionWarningHiding = false
+					warning.animate().cancel()
 					warning.isVisible = true
 					warning.animate().alpha(1f).setDuration(200).start()
 				}
-				else if(goodConnectionSeconds >= 3 && warning.isVisible)
-					warning.animate().alpha(0f).setDuration(400).withEndAction { warning.isGone = true }.start()
+				else if(goodConnectionSeconds >= 3 && warning.isVisible && !connectionWarningHiding)
+				{
+					connectionWarningHiding = true
+					warning.animate().alpha(0f).setDuration(400).withEndAction {
+						if(connectionWarningHiding)
+							warning.isGone = true
+						connectionWarningHiding = false
+					}.start()
+				}
 			}
 			statsHandler.postDelayed(this, CONNECTION_CHECK_MS)
 		}
@@ -1078,6 +1110,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		super.onDestroy()
 		rumble?.stop()
 		videoRenderer?.release()
+		abandonedRenderer?.release()
 		frontBufferVideo?.release()
 		frontBufferVideo = null
 		controlsDisposable.dispose()

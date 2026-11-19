@@ -327,9 +327,15 @@ static void *feedback_sender_thread_func(void *user)
 		return NULL;
 
 	uint64_t next_timeout = feedback_state_keepalive_ms;
+	// TS5: when the state last went out, so a wake-up for a redundant input copy doesn't also send it
+	uint64_t state_sent_ms = 0;
 	while(true)
 	{
-		next_timeout = feedback_state_keepalive_ms;
+		uint64_t now_ms = chiaki_time_now_monotonic_ms();
+		uint64_t keepalive = feedback_state_keepalive_ms;
+		next_timeout = state_sent_ms + keepalive > now_ms ? state_sent_ms + keepalive - now_ms : 0;
+		if(!next_timeout)
+			next_timeout = 1;
 		// TS5: wake up in time for the next redundant copy of the newest input
 		uint64_t resend_in = feedback_sender_resend_history(feedback_sender);
 		if(resend_in < next_timeout)
@@ -354,10 +360,18 @@ static void *feedback_sender_thread_func(void *user)
 				send_feedback_state = false;
 
 			send_feedback_history = !controller_state_equals_for_feedback_history(&feedback_sender->controller_state, &feedback_sender->controller_state_prev);
+		}
+		else if(chiaki_time_now_monotonic_ms() < state_sent_ms + feedback_state_keepalive_ms)
+		{
+			// TS5: woken for a redundant input copy (sent above), not because the keepalive is due
+			send_feedback_state = false;
 		} // else: timeout
 
 		if(send_feedback_state)
+		{
 			feedback_sender_send_state(feedback_sender);
+			state_sent_ms = chiaki_time_now_monotonic_ms();
+		}
 
 		if(send_feedback_history)
 			feedback_sender_send_history(feedback_sender);

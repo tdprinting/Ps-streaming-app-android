@@ -66,6 +66,10 @@ class StreamInput(val context: Context, val preferences: Preferences)
 	/** TS5: called on the direct input thread with each complete report from the gamepad */
 	fun setRawControllerState(state: ControllerState)
 	{
+		// Only while the device is registered: a report that races with setRawDevice(null) would
+		// otherwise leave its buttons held down
+		if(rawDeviceName == null)
+			return
 		rawControllerState = state
 		val sent = sendControllerState()
 		checkHotkeys(sent, false)

@@ -32,7 +32,9 @@ class RootInput private constructor(
 	val device: Device,
 	private val swapFaceButtons: Boolean,
 	private val stickDeadZone: Float,
-	private val onState: (ControllerState) -> Unit
+	private val onState: (ControllerState) -> Unit,
+	/** TS5: called on the reading thread if reading ends without [stop], e.g. root was revoked */
+	private val onEnded: () -> Unit
 )
 {
 	data class AbsInfo(val min: Int, val max: Int)
@@ -156,14 +158,17 @@ class RootInput private constructor(
 		}
 
 		/** Starts reading [device]. Null if `su` refuses. */
-		fun start(device: Device, swapFaceButtons: Boolean, stickDeadZone: Float, onState: (ControllerState) -> Unit): RootInput?
+		fun start(device: Device, swapFaceButtons: Boolean, stickDeadZone: Float, onEnded: () -> Unit,
+			onState: (ControllerState) -> Unit): RootInput?
 		{
-			val input = RootInput(device, swapFaceButtons, stickDeadZone, onState)
+			val input = RootInput(device, swapFaceButtons, stickDeadZone, onState, onEnded)
 			return if(input.open()) input else null
 		}
 	}
 
 	@Volatile private var process: java.lang.Process? = null
+	/** Set by [stop]: after it, no state is delivered, so none can arrive after the last release */
+	@Volatile private var stopped = false
 	private var thread: Thread? = null
 
 	// Input delay: kernel timestamp of each report to the moment it is sent on, in microseconds
@@ -266,6 +271,8 @@ class RootInput private constructor(
 					EV_ABS -> axes[code] = value
 					EV_SYN -> if(code == SYN_REPORT)
 					{
+						if(stopped)
+							return
 						onState(buildState())
 						// evdev timestamps on a client's own fd are CLOCK_REALTIME by default
 						val ageUs = System.currentTimeMillis() * 1000 - (sec * 1_000_000 + usec)
@@ -284,6 +291,8 @@ class RootInput private constructor(
 		{
 			Log.i(TAG, "Direct input ended: $e")
 		}
+		if(!stopped)
+			onEnded()
 	}
 
 	private fun key(code: Int, down: Boolean)
@@ -360,6 +369,7 @@ class RootInput private constructor(
 
 	fun stop()
 	{
+		stopped = true
 		process?.destroy()
 		process = null
 		thread?.interrupt()
