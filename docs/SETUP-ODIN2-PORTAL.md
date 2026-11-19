@@ -40,3 +40,11 @@
    - *Decoder: Snapdragon low latency* and *display 120 Hz*
    - packet loss near 0%. If it isn't, lower the bitrate (Quality: Sharp = 25 Mbit/s).
    - "Frames up to X ms apart" close to 17 ms. Big spikes mean Wi-Fi trouble.
+
+## Testing and sending results
+
+1. Open the setup check (home screen menu → Setup check) and tap **Apply best settings**.
+2. Stream a game for a few minutes with the settings you want to test (for example tearing mode, HDR shaders or direct input).
+3. Leave the stream, open the setup check again and tap **Share diagnostics**. It opens the share sheet and also copies the text, so you can paste it into a chat or an issue.
+
+The diagnostics hold the device and display modes, the setup check, your settings (accounts, tokens and keys are left out), what the last stream ran with (video path, decoder mode, refresh rate, HDR color space, audio mode, delays, losses) and the app's recent log. The log is cleared when the app restarts, so share before closing it.
