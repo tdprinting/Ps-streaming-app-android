@@ -20,10 +20,19 @@
 - [x] Research: input prediction, reprojection, frame generation (docs/PREDICTION-AND-FRAME-GEN.md)
 - [x] HDR10 streaming (H265 HDR codec, decoder color hints, plain SurfaceView path)
 
+## Done (v0.3)
+- [x] Renamed to TS5 Streaming, new icon
+- [x] Console-style home screen: particle background, hero title, animated tile row
+- [x] Direct kernel controller input (root, experimental) and input delay stats
+- [x] Moonlight-style frame pacing presets, connection warning, keep Wi-Fi awake
+- [x] PXPlay-style controller-only mode and stats hotkey
+- [x] Feature comparison (docs/FEATURE-COMPARISON.md)
+
 ## Next
 - [ ] **Test on the Odin 2 Portal**: confirm `c2.qti.*.low_latency` starts (see the log / statistics) and that the display stays at 120 Hz
 - [ ] Measure end to end delay with a 240 fps phone camera (button LED or on-screen counter) against Momiji and Sony's app, and record the results in `docs/LATENCY.md`
-- [ ] Root-only direct evdev input from native code (design in `docs/LATENCY.md`)
+- [ ] Test direct input on a rooted Odin 2 Portal (button and axis mapping)
+- [ ] On-screen controller layout editor
 - [ ] ADPF performance hint session for the decode and input threads (Android 13 `APerformanceHint`)
 - [ ] Odin preset button: one tap for all latency settings plus the Max quality preset
 - [ ] Optional: the decoder's own frame-ready callback (async MediaCodec) in place of the blocking output thread

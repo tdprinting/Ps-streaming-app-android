@@ -3,4 +3,10 @@
     <dimen name="console_art_height">136dp</dimen>
     <dimen name="console_image_height">64dp</dimen>
     <dimen name="console_image_offset">16dp</dimen>
+    <!-- TS5: more room for the home row on tall screens -->
+    <dimen name="home_tile_width">240dp</dimen>
+    <dimen name="home_tile_art_height">136dp</dimen>
+    <dimen name="home_hero_top">96dp</dimen>
+    <dimen name="home_hero_title">44sp</dimen>
+    <dimen name="home_row_bottom">48dp</dimen>
 </resources>

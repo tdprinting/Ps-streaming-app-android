@@ -64,7 +64,11 @@ For why input prediction and frame generation aren't the answer, see [PREDICTION
 
 At 60 Hz, a frame that finishes decoding just after a refresh waits almost 16.7 ms for the next one. At 120 Hz the wait is at most 8.3 ms. Each frame still stays on screen for 2 refreshes, so motion looks the same. The cost is a little more battery than 60 Hz. If you see uneven motion (judder), *Match the stream* gives you Momiji's 60 Hz behavior back.
 
-## Going further: bypassing Android's input stack (planned, needs root)
+## Bypassing Android's input stack (experimental, needs root)
+
+Settings → Latency → *Direct controller input*. Built in v0.3 as `session/RootInput.kt`. It uses a root `cat` of the device node and parses the events in a dedicated thread, instead of the native reader planned below, so no native root helper is needed. The stats overlay shows "Input: controller → console … (direct)" while it runs, or the Android path's delay when it doesn't, so you can compare the two.
+
+The original design notes:
 
 Unbuffered dispatch removes the biggest input delay Android adds, the wait for vsync. What's left is the path from the kernel's `/dev/input/eventN` through Android's InputReader and InputDispatcher. On a rooted Odin (Magisk), that can be skipped:
 

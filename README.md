@@ -21,6 +21,11 @@ It is a fork of [Momiji](https://github.com/yazanj082/momiji), the most complete
 | CPU scheduling | – | Hot threads kept on the **fast cores** |
 | Display path | Compositor, vsync | + experimental **tearing mode** (front buffer rendering) |
 | HDR | – | **HDR10 streaming** (H265 HDR codec), straight to the OLED |
+| Home screen | Material list | **Console-style home**: animated particle background, big focusable tiles |
+| Input | Android's input system | + experimental **direct kernel input** (root), input delay in stats |
+| Frame pacing | – | **Lowest latency / Balanced / Smoothest** presets |
+| Connection | – | **Unstable connection warning**, **keep Wi-Fi awake** |
+| Controller only | – | Use the device as a **wireless controller** for the console's TV |
 | Stats overlay | Network, decode, timing | + decoder mode, stale frames skipped, refresh rate, audio mode |
 
 Each one can be switched off in **Settings → Latency**. Remote Play itself is capped by Sony at 1080p and 60 fps, so no client can stream more than that. TS5 Streaming goes after everything between the PS5's encoder and your eyes.
@@ -31,6 +36,7 @@ Each one can be switched off in **Settings → Latency**. Remote Play itself is 
 - [Where the delay goes](docs/LATENCY.md): latency budget and how each feature works
 - [Research](docs/RESEARCH.md): the device, existing apps, and what they left on the table
 - [Input prediction, reprojection and frame generation](docs/PREDICTION-AND-FRAME-GEN.md): what can and can't help a stream
+- [Feature comparison with Moonlight and PXPlay](docs/FEATURE-COMPARISON.md)
 - [Roadmap](docs/ROADMAP.md): including root-only direct input that bypasses Android's input stack
 
 ## Getting the APK

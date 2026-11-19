@@ -12,9 +12,10 @@
     <dimen name="console_image_height">44dp</dimen>
     <dimen name="console_image_offset">22dp</dimen>
     <!-- TS5 home screen -->
-    <dimen name="home_hero_top">72dp</dimen>
+    <dimen name="home_hero_top">60dp</dimen>
     <dimen name="home_side_padding">40dp</dimen>
-    <dimen name="home_hero_title">38sp</dimen>
-    <dimen name="home_row_bottom">40dp</dimen>
-    <dimen name="home_tile_width">224dp</dimen>
+    <dimen name="home_hero_title">34sp</dimen>
+    <dimen name="home_row_bottom">12dp</dimen>
+    <dimen name="home_tile_width">200dp</dimen>
+    <dimen name="home_tile_art_height">100dp</dimen>
 </resources>

@@ -82,7 +82,8 @@ class DisplayHostRecyclerViewAdapter(
 				else -> context.getString(R.string.display_host_details, consoleType, host.host)
 			}
 			val runningApp = (host as? DiscoveredDisplayHost)?.discoveredHost?.runningAppName
-			it.bottomInfoTextView.isVisible = runningApp != null
+			// TS5: the running game shows in the hero text above the row
+			it.bottomInfoTextView.isVisible = false
 			it.bottomInfoTextView.text = runningApp?.let { app -> context.getString(R.string.display_host_playing, app) }
 
 			val (statusText, statusColor, artBackground) = when
@@ -160,10 +161,11 @@ class DisplayHostRecyclerViewAdapter(
 				}
 				it.menuButton.isVisible = true
 				it.menuButton.setOnClickListener(showMenu)
-				// With a remote or controller, holding the button on a console opens its options,
-				// and right goes to their button, which focus search skips as it is inside the card
+				// With a remote or controller, holding the button on a console opens its options.
+				// TS5: left and right move along the row of tiles, so the corner button isn't a focus stop.
 				it.root.setOnLongClickListener { view -> showMenu(view); true }
-				it.root.nextFocusRightId = R.id.menuButton
+				it.menuButton.isFocusable = false
+				it.root.nextFocusRightId = View.NO_ID
 			}
 			else
 			{
