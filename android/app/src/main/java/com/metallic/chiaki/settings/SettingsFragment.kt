@@ -58,6 +58,7 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 		preferences.lowLatencyAudioKey -> preferences.lowLatencyAudio
 		preferences.bigCoresKey -> preferences.bigCores
 		preferences.frontBufferKey -> preferences.frontBuffer
+		preferences.hdrShadersKey -> preferences.hdrShaders
 		preferences.directInputKey -> preferences.directInput
 		preferences.keepWifiAwakeKey -> preferences.keepWifiAwake
 		preferences.controllerOnlyKey -> preferences.controllerOnly
@@ -89,6 +90,7 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 			preferences.lowLatencyAudioKey -> preferences.lowLatencyAudio = value
 			preferences.bigCoresKey -> preferences.bigCores = value
 			preferences.frontBufferKey -> preferences.frontBuffer = value
+			preferences.hdrShadersKey -> preferences.hdrShaders = value
 			preferences.directInputKey -> preferences.directInput = value
 			preferences.keepWifiAwakeKey -> preferences.keepWifiAwake = value
 			preferences.controllerOnlyKey -> preferences.controllerOnly = value

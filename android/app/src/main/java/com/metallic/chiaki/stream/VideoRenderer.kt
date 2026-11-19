@@ -16,7 +16,10 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import javax.microedition.khronos.egl.EGL10
 import javax.microedition.khronos.egl.EGLConfig
+import javax.microedition.khronos.egl.EGLDisplay
+import javax.microedition.khronos.egl.EGLSurface
 import javax.microedition.khronos.opengles.GL10
 
 /**
@@ -37,8 +40,98 @@ class VideoRenderer(
     /** Source of SGSR's fragment shader ([UPSCALE_SHADER_ASSET]), or null to not upscale */
     private val upscaleShader: String?,
     private val requestRender: () -> Unit,
+    /** TS5: draw an HDR10 stream: 10-bit PQ surface, half float passes. Needs [hdrEgl] on the view */
+    private val hdr: Boolean = false,
+    /** TS5: called on the GL thread when this device can't draw HDR through the shaders */
+    private val onHdrUnavailable: () -> Unit = {},
     private val onSurfaceReady: (Surface) -> Unit
 ) : GLSurfaceView.Renderer, SurfaceTexture.OnFrameAvailableListener {
+
+    /**
+     * TS5: EGL setup for HDR10 through the shaders. The decoder's 10-bit frames are sampled as
+     * PQ-coded BT.2020 RGB, every pass keeps them in half float, and the last pass writes them to a
+     * 10-bit surface tagged BT.2020 PQ, so SurfaceFlinger shows them as HDR10, like the plain path.
+     * Set both on the GLSurfaceView before its renderer.
+     */
+    class HdrEgl {
+        companion object {
+            const val EGL_GL_COLORSPACE_KHR = 0x309D
+            const val EGL_GL_COLORSPACE_BT2020_PQ_EXT = 0x3340
+            const val EGL_OPENGL_ES3_BIT_KHR = 0x40
+        }
+
+        /** Whether the last window surface is 10-bit BT.2020 PQ; read on the GL thread */
+        @Volatile var surfaceIsPq = false
+            private set
+
+        private fun attr(egl: EGL10, display: EGLDisplay, config: EGLConfig, name: Int): Int {
+            val v = IntArray(1)
+            return if (egl.eglGetConfigAttrib(display, config, name, v)) v[0] else -1
+        }
+
+        private fun choose(egl: EGL10, display: EGLDisplay, r: Int, a: Int): EGLConfig? {
+            val attribs = intArrayOf(
+                EGL10.EGL_RED_SIZE, r, EGL10.EGL_GREEN_SIZE, r, EGL10.EGL_BLUE_SIZE, r, EGL10.EGL_ALPHA_SIZE, a,
+                EGL10.EGL_DEPTH_SIZE, 0, EGL10.EGL_STENCIL_SIZE, 0,
+                EGL10.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT_KHR, EGL10.EGL_SURFACE_TYPE, EGL10.EGL_WINDOW_BIT,
+                EGL10.EGL_NONE)
+            val configs = arrayOfNulls<EGLConfig>(32)
+            val count = IntArray(1)
+            if (!egl.eglChooseConfig(display, attribs, configs, configs.size, count))
+                return null
+            // eglChooseConfig also returns bigger configs; take an exact one
+            return configs.take(count[0]).filterNotNull().firstOrNull {
+                attr(egl, display, it, EGL10.EGL_RED_SIZE) == r && attr(egl, display, it, EGL10.EGL_BLUE_SIZE) == r
+                        && attr(egl, display, it, EGL10.EGL_ALPHA_SIZE) == a
+            }
+        }
+
+        val configChooser = GLSurfaceView.EGLConfigChooser { egl, display ->
+            choose(egl, display, 10, 2) ?: choose(egl, display, 8, 8)
+                ?: throw IllegalArgumentException("No EGL config for the video")
+        }
+
+        val surfaceFactory = object : GLSurfaceView.EGLWindowSurfaceFactory {
+            override fun createWindowSurface(egl: EGL10, display: EGLDisplay, config: EGLConfig, nativeWindow: Any?): EGLSurface? {
+                val extensions = egl.eglQueryString(display, EGL10.EGL_EXTENSIONS) ?: ""
+                if (attr(egl, display, config, EGL10.EGL_RED_SIZE) == 10 && extensions.contains("EGL_EXT_gl_colorspace_bt2020_pq")) {
+                    val surface = try {
+                        egl.eglCreateWindowSurface(display, config, nativeWindow,
+                            intArrayOf(EGL_GL_COLORSPACE_KHR, EGL_GL_COLORSPACE_BT2020_PQ_EXT, EGL10.EGL_NONE))
+                    } catch (e: IllegalArgumentException) { null }
+                    if (surface != null && surface != EGL10.EGL_NO_SURFACE) {
+                        surfaceIsPq = true
+                        return surface
+                    }
+                    Log.w(TAG, "HDR: no BT.2020 PQ window surface (0x${Integer.toHexString(egl.eglGetError())})")
+                } else {
+                    Log.w(TAG, "HDR: no 10-bit config or no EGL_EXT_gl_colorspace_bt2020_pq")
+                }
+                surfaceIsPq = false
+                return try {
+                    egl.eglCreateWindowSurface(display, config, nativeWindow, null)
+                } catch (e: IllegalArgumentException) { null }
+            }
+
+            override fun destroySurface(egl: EGL10, display: EGLDisplay, surface: EGLSurface) {
+                egl.eglDestroySurface(display, surface)
+            }
+        }
+    }
+
+    /** TS5: set on the view for an HDR renderer */
+    val hdrEgl: HdrEgl? = if (hdr) HdrEgl() else null
+
+    /** TS5: HDR10 is drawn through the shaders; known once the GL surface exists */
+    @Volatile var hdrActive = false
+        private set
+
+    /** TS5: color space of the decoder's frames (Android 13+), for the statistics, or null */
+    @Volatile var inputDataSpace: Int? = null
+        private set
+
+    /** Format of the passes' textures: half float for HDR, so 10-bit color isn't cut to 8 */
+    private var targetFormat = GLES30.GL_RGBA8
 
     companion object {
         private const val TAG = "VideoRenderer"
@@ -105,9 +198,10 @@ class VideoRenderer(
             uniform highp float u_Sharpness;
             // 1 when SGSR comes next and needs the luma in alpha, 0 on the screen
             uniform float u_LumaInAlpha;
-
+            // TS5: smaller steps for 10-bit HDR, whose bands and dither are finer than 8-bit's
+            uniform float u_DebandThreshold;
+            uniform float u_DitherScale;
             // Stochastic Debanding v2 Parameters
-            const float DEBAND_THRESHOLD = 0.02;   // Sensitivity to banding steps (lower = safer for textures)
             // 12 jittered samples on a golden angle spiral smooth gradients as well as 24 did,
             // at half the cost, which keeps 60 fps on throttled phones (e.g. in Samsung DeX)
             const int NUM_SAMPLES = 12;
@@ -157,7 +251,7 @@ class VideoRenderer(
 
                     // Soft threshold: skip edges, keep gradients.
                     // Lower threshold means we only blend very similar colors.
-                    float w = 1.0 - smoothstep(0.0, DEBAND_THRESHOLD, diff);
+                    float w = 1.0 - smoothstep(0.0, u_DebandThreshold, diff);
                     sum += s * w;
                     totalW += w;
                 }
@@ -195,7 +289,7 @@ class VideoRenderer(
                 // FINAL DITHER
                 // ═══════════════════════════════════════════════════════════════
                 float dither = (ign(v_TexCoord + timeSeed) - 0.5) * 0.005;
-                color += vec3(dither + GRAIN_STRENGTH * (rand(v_TexCoord, timeSeed) - 0.5));
+                color += vec3(dither + GRAIN_STRENGTH * (rand(v_TexCoord, timeSeed) - 0.5)) * u_DitherScale;
 
                 float luma = dot(clamp(color, 0.0, 1.0), vec3(0.2126, 0.7152, 0.0722));
                 outColor = vec4(color, mix(1.0, luma, u_LumaInAlpha));
@@ -310,6 +404,8 @@ class VideoRenderer(
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         // New GL context: everything is created again
+        hdrActive = hdr && setUpHdr()
+        targetFormat = if (hdrActive) GLES30.GL_RGBA16F else GLES30.GL_RGBA8
         copyProgram = Program(createProgram(COPY_VERTEX_SHADER, COPY_FRAGMENT_SHADER)).also {
             GLES30.glUseProgram(it.id)
             GLES30.glUniform1i(it.uniformLoc("u_Texture"), 0)
@@ -323,6 +419,8 @@ class VideoRenderer(
                 GLES30.glUniform2f(it.uniformLoc("u_ScreenSize"), videoWidth.toFloat(), videoHeight.toFloat())
                 GLES30.glUniform1f(it.uniformLoc("u_Sharpness"), sharpness)
                 GLES30.glUniform1f(it.uniformLoc("u_LumaInAlpha"), if (upscaling) 1f else 0f)
+                GLES30.glUniform1f(it.uniformLoc("u_DebandThreshold"), if (hdrActive) 0.008f else 0.02f)
+                GLES30.glUniform1f(it.uniformLoc("u_DitherScale"), if (hdrActive) 0.25f else 1f)
                 uDebandTimeLoc = it.uniformLoc("u_Time")
             }
         } else null
@@ -352,7 +450,9 @@ class VideoRenderer(
             it.setDefaultBufferSize(videoWidth, videoHeight)
             it.setOnFrameAvailableListener(this)
             surface = Surface(it)
-            onSurfaceReady(surface!!)
+            // TS5: an HDR stream this renderer can't draw goes to the plain path instead
+            if (!hdr || hdrActive)
+                onSurfaceReady(surface!!)
         }
 
         // Create vertex buffer
@@ -391,12 +491,62 @@ class VideoRenderer(
         }
     }
 
+    /**
+     * TS5: whether HDR can be drawn here: a BT.2020 PQ window surface and half float render
+     * targets. Also gives the surface HDR10 static metadata, as the decoder's doesn't reach it.
+     */
+    private fun setUpHdr(): Boolean {
+        if (hdrEgl?.surfaceIsPq != true) {
+            onHdrUnavailable()
+            return false
+        }
+        val version = IntArray(2)
+        GLES30.glGetIntegerv(GLES30.GL_MAJOR_VERSION, version, 0)
+        GLES30.glGetIntegerv(GLES30.GL_MINOR_VERSION, version, 1)
+        val extensions = GLES30.glGetString(GLES30.GL_EXTENSIONS) ?: ""
+        val halfFloatTargets = version[0] > 3 || (version[0] == 3 && version[1] >= 2)
+                || extensions.contains("GL_EXT_color_buffer_half_float") || extensions.contains("GL_EXT_color_buffer_float")
+        if (!halfFloatTargets) {
+            Log.w(TAG, "HDR: no half float render targets")
+            onHdrUnavailable()
+            return false
+        }
+        setHdrMetadata()
+        Log.i(TAG, "HDR: drawing through the shaders on a 10-bit BT.2020 PQ surface")
+        return true
+    }
+
+    /** HDR10 mastering display (BT.2020, D65, 1000 nits) and content light levels, where EGL takes them */
+    private fun setHdrMetadata() {
+        val display = android.opengl.EGL14.eglGetCurrentDisplay()
+        val surface = android.opengl.EGL14.eglGetCurrentSurface(android.opengl.EGL14.EGL_DRAW)
+        val extensions = android.opengl.EGL14.eglQueryString(display, android.opengl.EGL14.EGL_EXTENSIONS) ?: ""
+        val scale = 50000f // EGL_METADATA_SCALING_EXT
+        fun set(name: Int, value: Float) =
+            android.opengl.EGL14.eglSurfaceAttrib(display, surface, name, (value * scale).toInt())
+        if (extensions.contains("EGL_EXT_surface_SMPTE2086_metadata")) {
+            set(0x3341, 0.708f); set(0x3342, 0.292f)   // red
+            set(0x3343, 0.170f); set(0x3344, 0.797f)   // green
+            set(0x3345, 0.131f); set(0x3346, 0.046f)   // blue
+            set(0x3347, 0.3127f); set(0x3348, 0.3290f) // white point
+            set(0x3349, 1000f)                          // max luminance, nits
+            set(0x334A, 0.0001f)                        // min luminance
+        }
+        if (extensions.contains("EGL_EXT_surface_CTA861_3_metadata")) {
+            set(0x3360, 1000f) // max content light level
+            set(0x3361, 400f)  // max frame average light level
+        }
+    }
+
     private fun createRenderTarget(): RenderTarget {
         val ids = IntArray(1)
         GLES30.glGenTextures(1, ids, 0)
         val textureId = ids[0]
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, textureId)
-        GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA8, videoWidth, videoHeight, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, null)
+        if (targetFormat == GLES30.GL_RGBA16F)
+            GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA16F, videoWidth, videoHeight, 0, GLES30.GL_RGBA, GLES30.GL_HALF_FLOAT, null)
+        else
+            GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA8, videoWidth, videoHeight, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, null)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_CLAMP_TO_EDGE)
@@ -428,6 +578,8 @@ class VideoRenderer(
             surfaceTexture?.let {
                 repeat(pending) { _ -> it.updateTexImage() }
                 it.getTransformMatrix(stMatrix)
+                if (hdr && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU)
+                    inputDataSpace = it.dataSpace
             }
             framesShown.incrementAndGet()
         }

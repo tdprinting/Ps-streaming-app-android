@@ -366,13 +366,15 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 	private fun setupVideoOutput() {
 		val prefs = Preferences(this)
 		viewModel.session.detachSurface()
-		// TS5 HDR: 10-bit video must reach SurfaceFlinger untouched. The shader paths draw in 8-bit
-		// RGBA, which would clip and mistone it, so an HDR stream always takes the plain SurfaceView.
+		// TS5 HDR: 10-bit video must reach SurfaceFlinger without being cut to 8 bits. With HDR
+		// shaders on, the shader path draws it in half float to a 10-bit BT.2020 PQ surface; without,
+		// or where the device can't, an HDR stream takes the plain SurfaceView.
 		val hdr = isHdrStream()
-		if (hdr && (prefs.debandingEnabled || prefs.upscalingEnabled || prefs.frontBuffer))
+		val hdrShaders = hdr && prefs.hdrShaders && !hdrShadersFailed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+		if (hdr && ((!hdrShaders && (prefs.debandingEnabled || prefs.upscalingEnabled)) || prefs.frontBuffer))
 			android.widget.Toast.makeText(this, R.string.stream_hdr_disables_shaders, android.widget.Toast.LENGTH_LONG).show()
-		val upscale = !hdr && prefs.upscalingEnabled && VideoRenderer.isUpscalingSupported(this)
-		val deband = !hdr && prefs.debandingEnabled
+		val upscale = (!hdr || hdrShaders) && prefs.upscalingEnabled && VideoRenderer.isUpscalingSupported(this)
+		val deband = (!hdr || hdrShaders) && prefs.debandingEnabled
 		frontBufferVideo?.release()
 		frontBufferVideo = null
 
@@ -396,14 +398,23 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 				assets.open(VideoRenderer.UPSCALE_SHADER_ASSET).bufferedReader().use { it.readText() }
 			else
 				null
-			videoRenderer = VideoRenderer(videoProfile.width, videoProfile.height, deband,
-				prefs.sharpnessIntensity, upscaleShader, { binding.debandSurfaceView.requestRender() }) { surface ->
+			val renderer = VideoRenderer(videoProfile.width, videoProfile.height, deband,
+				prefs.sharpnessIntensity, upscaleShader, { binding.debandSurfaceView.requestRender() },
+				hdr = hdr, onHdrUnavailable = { runOnUiThread { fallBackFromHdrShaders() } }) { surface ->
 				viewModel.session.attachToSurface(surface)
 			}
+			videoRenderer = renderer
 
 			binding.debandSurfaceView.setEGLContextClientVersion(3)
-			binding.debandSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 0, 0)
-			binding.debandSurfaceView.holder.setFormat(android.graphics.PixelFormat.RGBA_8888)
+			val hdrEgl = renderer.hdrEgl
+			if (hdrEgl != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+				binding.debandSurfaceView.setEGLConfigChooser(hdrEgl.configChooser)
+				binding.debandSurfaceView.setEGLWindowSurfaceFactory(hdrEgl.surfaceFactory)
+				binding.debandSurfaceView.holder.setFormat(android.graphics.PixelFormat.RGBA_1010102)
+			} else {
+				binding.debandSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 0, 0)
+				binding.debandSurfaceView.holder.setFormat(android.graphics.PixelFormat.RGBA_8888)
+			}
 			// Debanding runs at the stream's resolution, as its cost would grow with the window (a
 			// 1440p/4K monitor in DeX is far too slow and stalls the video). Without upscaling, the
 			// surface has that size too and the system scales it to the view. Upscaling needs the view's
@@ -419,6 +430,20 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			binding.debandSurfaceView.visibility = View.GONE
 			viewModel.session.attachToSurfaceView(binding.surfaceView)
 		}
+	}
+
+	/** TS5: this device couldn't draw HDR through the shaders, so this stream uses the plain path */
+	private var hdrShadersFailed = false
+
+	private fun fallBackFromHdrShaders()
+	{
+		if(hdrShadersFailed || isFinishing)
+			return
+		hdrShadersFailed = true
+		android.widget.Toast.makeText(this, R.string.stream_hdr_shaders_unavailable, android.widget.Toast.LENGTH_LONG).show()
+		// The GL view keeps its renderer, it's only hidden; the video moves to the plain SurfaceView
+		videoRenderer = null
+		setupVideoOutput()
 	}
 
 	private var lastFragmentControllerState = com.metallic.chiaki.lib.ControllerState()
@@ -895,7 +920,10 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 				?: viewModel.input.takeInputAge()?.let { (avg, max) -> format(R.string.stream_stats_input_android, avg, max) }),
 			if(isHdrStream())
 				format(R.string.stream_stats_hdr, getString(
-					if(displayReportsHdr10()) R.string.stream_stats_hdr_on else R.string.stream_stats_hdr_tonemapped))
+					if(displayReportsHdr10()) R.string.stream_stats_hdr_on else R.string.stream_stats_hdr_tonemapped)
+					+ (videoRenderer?.takeIf { it.hdrActive }?.let { r ->
+						getString(R.string.stream_stats_hdr_shaders, r.inputDataSpace?.let { dataSpaceName(it) } ?: "?")
+					} ?: ""))
 			else
 				null,
 			frontBufferVideo?.let {
@@ -904,6 +932,20 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			},
 			thermalStatus()?.let { format(R.string.stream_stats_thermal, thermalStatusText(it)) }
 		).joinToString("\n")
+	}
+
+	/** TS5: a frame's color space as the decoder tagged it: BT.2020 PQ is what HDR10 should be */
+	private fun dataSpaceName(dataSpace: Int): String
+	{
+		val standard = (dataSpace shr 16) and 0x3f
+		val transfer = (dataSpace shr 22) and 0x1f
+		return when
+		{
+			standard == 6 && transfer == 7 -> "BT.2020 PQ"
+			standard == 6 && transfer == 8 -> "BT.2020 HLG"
+			standard == 6 -> "BT.2020, not PQ"
+			else -> "0x" + Integer.toHexString(dataSpace) + " (not HDR10)"
+		}
 	}
 
 	/** TS5: whether this stream is HDR10, which only a PS5 sends */

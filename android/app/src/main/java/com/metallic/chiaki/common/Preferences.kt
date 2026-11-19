@@ -237,6 +237,12 @@ class Preferences(context: Context)
 	 * TS5, experimental: draw each frame straight into the buffer the display is scanning out
 	 * (front buffer rendering), skipping the wait for the next refresh and the compositor. Tears.
 	 */
+	/** TS5: draw HDR streams through debanding and super resolution, in 10-bit */
+	val hdrShadersKey get() = "hdr_shaders"
+	var hdrShaders
+		get() = sharedPreferences.getBoolean(hdrShadersKey, false)
+		set(value) { sharedPreferences.edit().putBoolean(hdrShadersKey, value).apply() }
+
 	val frontBufferKey get() = "latency_front_buffer"
 	var frontBuffer
 		get() = sharedPreferences.getBoolean(frontBufferKey, false)

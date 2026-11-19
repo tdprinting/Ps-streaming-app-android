@@ -159,6 +159,14 @@
             app:defaultValue="false"
             app:icon="@drawable/ic_resolution" />
 
+        <!-- TS5: debanding and super resolution on HDR streams -->
+        <SwitchPreference
+            app:key="hdr_shaders"
+            app:title="@string/preferences_hdr_shaders_title"
+            app:summary="@string/preferences_hdr_shaders_summary"
+            app:defaultValue="false"
+            app:icon="@drawable/ic_resolution" />
+
         <!-- Off by default: drawing through shaders adds delay, and it only helps on screens with more
              pixels than the stream -->
         <SwitchPreference
