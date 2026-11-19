@@ -32,6 +32,20 @@
             app:drawablePressed="@android:color/transparent" />
     </com.metallic.chiaki.stream.AspectRatioFrameLayout>
 
+    <!-- TS5: shown in controller-only mode, where there is no picture -->
+    <TextView
+        android:id="@+id/controllerOnlyNotice"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:padding="24dp"
+        android:textColor="#CCFFFFFF"
+        android:textSize="18sp"
+        android:fontFamily="sans-serif-light"
+        android:visibility="gone"
+        android:text="@string/stream_controller_only_notice" />
+
     <!-- TS5: poor connection warning, like Moonlight's -->
     <TextView
         android:id="@+id/connectionWarning"

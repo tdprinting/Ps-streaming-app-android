@@ -193,6 +193,12 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getBoolean(bigCoresKey, true)
 		set(value) { sharedPreferences.edit().putBoolean(bigCoresKey, value).apply() }
 
+	/** TS5: controller-only mode, like PXPlay's virtual controller: no video or audio is streamed */
+	val controllerOnlyKey get() = "stream_controller_only"
+	var controllerOnly
+		get() = sharedPreferences.getBoolean(controllerOnlyKey, false)
+		set(value) { sharedPreferences.edit().putBoolean(controllerOnlyKey, value).apply() }
+
 	/** TS5: repeat the controller state every 20 ms so Wi-Fi never dozes between inputs */
 	val keepWifiAwakeKey get() = "latency_keep_wifi_awake"
 	var keepWifiAwake

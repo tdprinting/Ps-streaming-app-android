@@ -68,6 +68,7 @@ class StreamInput(val context: Context, val preferences: Preferences)
 	{
 		rawControllerState = state
 		val sent = sendControllerState()
+		checkHotkeys(sent, false)
 		val comboHeld = sent.buttons and MENU_COMBO == MENU_COMBO
 		if(comboHeld && !menuComboActive)
 			mainHandler.post { menuComboCallback?.invoke() }
@@ -328,12 +329,27 @@ class StreamInput(val context: Context, val preferences: Preferences)
 	 * with nothing but a controller, e.g. on a TV box.
 	 */
 	var menuComboCallback: (() -> Unit)? = null
+	/** TS5 hotkey L1 + R1 + L3: toggles the statistics overlay. Called on the main thread. */
+	var statsComboCallback: (() -> Unit)? = null
+	private var statsComboActive = false
+
+	/** TS5: fires the hotkeys on the press of their last button */
+	private fun checkHotkeys(state: ControllerState, onMain: Boolean)
+	{
+		val held = state.buttons and STATS_COMBO == STATS_COMBO
+		if(held && !statsComboActive)
+		{
+			if(onMain) statsComboCallback?.invoke() else mainHandler.post { statsComboCallback?.invoke() }
+		}
+		statsComboActive = held
+	}
 	private var menuComboActive = false
 
 	/** Called on the main thread */
 	private fun controllerStateUpdated()
 	{
 		val state = sendControllerState()
+		checkHotkeys(state, true)
 		val comboHeld = state.buttons and MENU_COMBO == MENU_COMBO
 		val comboPressed = comboHeld && !menuComboActive
 		menuComboActive = comboHeld
@@ -650,6 +666,7 @@ class StreamInput(val context: Context, val preferences: Preferences)
 
 		private val MENU_COMBO = ControllerState.BUTTON_L1 or ControllerState.BUTTON_R1 or
 				ControllerState.BUTTON_OPTIONS or ControllerState.BUTTON_SHARE
+		private val STATS_COMBO = ControllerState.BUTTON_L1 or ControllerState.BUTTON_R1 or ControllerState.BUTTON_L3
 
 		private val defaultAxisLayout = AxisLayout(
 			MotionEvent.AXIS_Z,

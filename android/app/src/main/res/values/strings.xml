@@ -468,6 +468,9 @@
     <string name="home_hero_standby">In rest mode · press A to wake and play</string>
     <string name="home_hero_play">Press A to play</string>
     <string name="home_hero_register">New console · press A to link it</string>
+    <string name="preferences_controller_only_title">Controller only</string>
+    <string name="preferences_controller_only_summary">Use this device just as a controller for a game on the console\'s own TV: no picture or sound is streamed, saving battery and Wi-Fi</string>
+    <string name="stream_controller_only_notice">Controller mode\nYour game is on the console\'s screen. L1 + R1 + Options + Create opens the menu.</string>
     <string name="stream_stats_latency" translatable="false">Decoder: %1$s · %2$d stale frames skipped · display %3$.0f Hz</string>
     <string name="stream_stats_decoder_snapdragon">Snapdragon low latency</string>
     <string name="stream_stats_decoder_low_latency">low latency</string>

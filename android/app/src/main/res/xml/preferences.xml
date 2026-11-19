@@ -139,6 +139,12 @@
             app:icon="@drawable/ic_display_normal"
             app:isPreferenceVisible="false" />
 
+        <SwitchPreference
+            app:key="stream_controller_only"
+            app:title="@string/preferences_controller_only_title"
+            app:summary="@string/preferences_controller_only_summary"
+            app:icon="@drawable/ic_display_normal" />
+
         <ListPreference
             app:key="@string/preferences_codec_key"
             app:title="@string/preferences_codec_title"

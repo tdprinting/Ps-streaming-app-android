@@ -100,6 +100,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		Preferences(this).let {
 			LatencyOptions.apply(it.skipStaleFrames, it.snapdragonTuning, it.snapdragonEarlyOutput,
 				it.lowLatencyAudio, it.bigCores, if(it.keepWifiAwake) 20 else 0)
+			LatencyOptions.setControllerOnly(it.controllerOnly)
 		}
 
 		viewModel = ViewModelProvider(this, viewModelFactory {
@@ -135,6 +136,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		binding = ActivityStreamBinding.inflate(layoutInflater)
 		setContentView(binding.root)
 		requestUnbufferedInput()
+		binding.controllerOnlyNotice.isVisible = Preferences(this).controllerOnly
 		window.decorView.setOnSystemUiVisibilityChangeListener(this)
 
 		viewModel.onScreenControlsVisible.observe(this, Observer {
@@ -507,7 +509,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		if(Preferences(this).streamStatsEnabled)
 			setStatsVisible(true)
 		statsHandler.post(checkBatteryRunnable)
-		if(Preferences(this).connectionWarnings)
+		if(Preferences(this).connectionWarnings && !Preferences(this).controllerOnly)
 			statsHandler.postDelayed(checkConnectionRunnable, CONNECTION_CHECK_MS)
 		startStreamCheck()
 		getSystemService(DisplayManager::class.java)?.registerDisplayListener(displayListener, Handler(Looper.getMainLooper()))
@@ -570,6 +572,10 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		hideSystemUI()
 		(getSystemService(INPUT_SERVICE) as InputManager).registerInputDeviceListener(inputDeviceListener, null)
 		viewModel.input.menuComboCallback = { showStreamMenu() }
+		// TS5 hotkey: L1 + R1 + L3 shows or hides the statistics
+		viewModel.input.statsComboCallback = {
+			binding.statsSwitch.isChecked = !binding.statsSwitch.isChecked
+		}
 	}
 
 	private var wifiLock: WifiManager.WifiLock? = null

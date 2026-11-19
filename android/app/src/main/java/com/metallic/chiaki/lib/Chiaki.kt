@@ -106,6 +106,7 @@ private class ChiakiNative
 		@JvmStatic external fun setLatencyOptions(skipStaleFrames: Boolean, snapdragonTuning: Boolean,
 			snapdragonEarlyOutput: Boolean, lowLatencyAudio: Boolean, bigCores: Boolean, keepaliveMs: Int)
 		@JvmStatic external fun sessionGetHealth(ptr: Long, health: FloatArray)
+		@JvmStatic external fun setControllerOnly(enabled: Boolean)
 		@JvmStatic external fun sessionLogInfo(ptr: Long, text: String)
 		@JvmStatic external fun holepunchListDevices(result: CreateResult, token: String, ps5: Boolean): Array<HolepunchDevice>?
 		@JvmStatic external fun holepunchCreate(token: String, logFile: String?, logVerbose: Boolean): Long
@@ -510,6 +511,9 @@ object LatencyOptions
 	fun apply(skipStaleFrames: Boolean, snapdragonTuning: Boolean, snapdragonEarlyOutput: Boolean,
 		lowLatencyAudio: Boolean, bigCores: Boolean, keepaliveMs: Int) =
 		ChiakiNative.setLatencyOptions(skipStaleFrames, snapdragonTuning, snapdragonEarlyOutput, lowLatencyAudio, bigCores, keepaliveMs)
+
+	/** TS5: the console sends no video or audio, for using this device as a controller only */
+	fun setControllerOnly(enabled: Boolean) = ChiakiNative.setControllerOnly(enabled)
 }
 
 /**

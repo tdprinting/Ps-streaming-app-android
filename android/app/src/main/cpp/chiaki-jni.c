@@ -400,6 +400,9 @@ static ChiakiLog *log_create(JNIEnv *env, jstring log_file_str, jboolean log_ver
  * over, also when creating the session fails.
  * @param psn_account_id_array the account id of the PSN sign-in, for a connection through PSN
  */
+/** TS5: controller-only mode for sessions created from now on, see setControllerOnly */
+static volatile bool ts5_controller_only = false;
+
 JNIEXPORT void JNICALL JNI_FCN(sessionCreate)(JNIEnv *env, jobject obj, jobject result, jobject connect_info_obj, jstring log_file_str, jboolean log_verbose, jobject java_session,
 		jlong holepunch_ptr, jbyteArray psn_account_id_array)
 {
@@ -495,6 +498,10 @@ JNIEXPORT void JNICALL JNI_FCN(sessionCreate)(JNIEnv *env, jobject obj, jobject 
 	// Like chiaki-ng: the console hears of up to 5 % loss and lowers the bitrate on a weak network.
 	// At 0, it was told there was never any loss and kept sending at full rate.
 	connect_info.packet_loss_max = 0.05;
+	// TS5 controller-only mode (like PXPlay's virtual controller): the console sends no video or
+	// audio, the device is just a gamepad for a game shown on the console's own TV
+	if(ts5_controller_only)
+		connect_info.audio_video_disabled = (ChiakiDisableAudioVideo)(CHIAKI_AUDIO_DISABLED | CHIAKI_VIDEO_DISABLED);
 
 	session = CHIAKI_NEW(AndroidChiakiSession);
 	if(!session)
@@ -787,6 +794,11 @@ JNIEXPORT void JNICALL JNI_FCN(sessionGetStats)(JNIEnv *env, jobject obj, jlong 
 		android_chiaki_audio_output_exclusive(session->audio_output) ? 1.0f : 0.0f
 	};
 	E->SetFloatArrayRegion(env, stats_array, 0, 12, stats);
+}
+
+JNIEXPORT void JNICALL JNI_FCN(setControllerOnly)(JNIEnv *env, jobject obj, jboolean enabled)
+{
+	ts5_controller_only = enabled;
 }
 
 /** TS5 latency options for decoders created from now on, see video-decoder.h */
