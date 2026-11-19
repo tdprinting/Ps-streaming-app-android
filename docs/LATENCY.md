@@ -6,17 +6,31 @@ Rough end-to-end path from pressing a button to seeing the result, for a 1080p60
 |---|---|---|---|
 | Button → Android input system | ~1–4 ms | Odin firmware | – (see *root input* below) |
 | Android → app (MotionEvent batching) | 0–16.7 ms at 60 Hz, 0–8.3 at 120 Hz | Android | **Unbuffered dispatch**: 0 |
-| App → network | <1 ms | chiaki-ng | Already sends on change |
-| Wi-Fi up + down | ~1–5 ms | Your network | Low latency Wi-Fi lock (from Momiji) |
+| App → network | <1 ms | chiaki-ng | Already sends on change; threads kept on fast cores |
+| Wi-Fi up + down | ~1–5 ms | Your network | Low latency Wi-Fi lock (from Momiji); **DSCP EF marking** |
 | Game reacts and renders the next frame | 8–33 ms+ | The game | Pick 120 fps / performance modes on the PS5 |
 | PS5 capture + encode | ~5–10 ms | Sony | – |
 | Frame over Wi-Fi + FEC reassembly | ~2–6 ms | Network, bitrate | 6 GHz recommended |
-| Hardware decode | ~3–8 ms | SoC, decoder setup | **Qualcomm low latency instance + max clock** |
+| Hardware decode | ~3–8 ms | SoC, decoder setup | **Qualcomm low latency instance + max clock + software-fence early output** |
+| SurfaceFlinger latch + display | 1–2 refreshes | Android compositor | **Tearing mode** (experimental): skipped |
 | Wait for display refresh | avg 8.3 / max 16.7 ms at 60 Hz | Display mode | **120 Hz: avg 4.2 / max 8.3 ms** |
 | Panel scan-out | ~16 ms at 60 Hz | Panel | **~8 ms at 120 Hz** |
 | Backed-up frames after a hiccup | +1 refresh each | Display queue | **Newest frame wins** |
 
-Adding up the parts Hayai changes, the best case is roughly **10–20 ms less** than a 60 Hz client with batched input. Most of that comes from the 120 Hz display and unbuffered input. The decoder tuning saves a few ms on top.
+Adding up the parts Hayai changes, the best case is roughly **10–20 ms less** than a 60 Hz client with batched input. Most of that comes from the 120 Hz display and unbuffered input. The decoder tuning saves a few ms on top. Tearing mode could save another refresh or two (8–17 ms at 120 Hz) where the Odin's display stack supports it. This is untested on the device yet: check the statistics overlay.
+
+### Audio path
+
+| Stage | Before (Momiji) | Hayai low latency audio |
+|---|---|---|
+| Opus decode | MediaCodec, a few ms | same |
+| App buffer (absorbs Wi-Fi jitter) | trimmed to 20 ms once it stays above 40 ms for 4 s | **trimmed to 10 ms once it stays above 20 ms for 2 s** |
+| Android mixer | shared stream, through AudioFlinger | **exclusive MMAP stream: no mixer**, written straight into the buffer the DSP reads |
+| Device buffer | Android's default | **2 bursts** ("double buffer", Android's recommendation), +1 burst after each underrun, at most 6 |
+
+The statistics overlay shows "Audio: exclusive (bypasses mixer) · device buffer X ms". If Android can't give exclusive access (another app holds it, or an HDMI or USB output), it opens a shared stream and the overlay says *shared*.
+
+**Avoid Bluetooth headphones** for low latency. Bluetooth audio usually adds 100–200 ms no matter what the app does. Use the Odin's speakers, the 3.5 mm jack or USB-C audio.
 
 ## The features, in code
 
@@ -27,11 +41,24 @@ Adding up the parts Hayai changes, the best case is roughly **10–20 ms less** 
 | Newest frame wins | Always show the newest frame (on) | `video-decoder.c` output thread |
 | Snapdragon decoder | Snapdragon decoder tuning (on) | `video-decoder.c` `attempts[]`, `create_format()` |
 | Full clocks | Sustained performance mode (off on AYN) | `StreamActivity.onCreate` |
+| Early decoder output | Snapdragon early frame output (on) | `video-decoder.c` `create_format()` |
+| Low latency audio | Low latency audio (on, off on TVs) | `audio-output.cpp` `open_stream()`, `tune_buffer()`, `catch_up()` |
+| Fast cores only | Fast CPU cores only (on) | `lib/src/thread.c` `pin_current_thread_to_big_cores()` |
+| Wi-Fi priority | – (always) | `lib/src/takion.c` `takion_set_qos()` |
+| Tearing mode | Tearing mode (experimental, off) | `stream/FrontBufferVideo.kt` |
 | Game Mode | – | `res/xml/game_mode_config.xml` |
 
 The decoder tries, in order: `c2.qti.{avc,hevc}.decoder.low_latency` → `c2.qti.{avc,hevc}.decoder` (both with Snapdragon keys) → the default decoder with generic low latency keys → the default decoder with no extra keys. The statistics overlay shows which one is running.
 
-**If the picture glitches**, turn off *Snapdragon decoder tuning* first, then *Always show the newest frame*.
+**If the picture glitches**, turn off *Snapdragon early frame output* first, then *Snapdragon decoder tuning*, then *Always show the newest frame*. **If audio crackles**, turn off *Low latency audio*.
+
+## Tearing mode (experimental)
+
+Normally a decoded frame goes into a queue, SurfaceFlinger picks it up at the next vsync, and the display shows it at the vsync after. Tearing mode uses Android 13's front buffer rendering (androidx.graphics `GLFrontBufferedRenderer`, built for stylus ink): the decoder writes into a texture, and each new frame is drawn with the GPU straight into the buffer the panel is reading. It shows up mid-refresh, so you may see a tear line where the old and new frames meet.
+
+It only turns on when the device reports `HardwareBuffer.USAGE_FRONT_BUFFER` support. Otherwise the normal path is used. It can't be combined with debanding or super resolution.
+
+For why input prediction and frame generation aren't the answer, see [PREDICTION-AND-FRAME-GEN.md](PREDICTION-AND-FRAME-GEN.md).
 
 ## Why 120 Hz helps a 60 fps stream
 

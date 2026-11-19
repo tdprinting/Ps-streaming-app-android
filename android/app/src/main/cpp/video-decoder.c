@@ -120,6 +120,16 @@ static AMediaFormat *create_format(AndroidChiakiVideoDecoder *decoder,
   AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_WIDTH, decoder->target_width);
   AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_HEIGHT,
                         decoder->target_height);
+  if (chiaki_codec_is_hdr(decoder->target_codec)) {
+    // Hayai HDR: the PS5 sends 10-bit HEVC in HDR10 (BT.2020 primaries, PQ
+    // transfer, limited range). The stream's own VUI says the same; these are
+    // hints so the decoder tags its 10-bit output as HDR from the
+    // first frame, which lets SurfaceFlinger show it on the OLED in HDR (or
+    // tone map it on a display without HDR).
+    AMediaFormat_setInt32(format, "color-standard", 6);  // COLOR_STANDARD_BT2020
+    AMediaFormat_setInt32(format, "color-transfer", 6);  // COLOR_TRANSFER_ST2084
+    AMediaFormat_setInt32(format, "color-range", 2);     // COLOR_RANGE_LIMITED
+  }
   if (tier == LATENCY_TIER_PLAIN)
     return format;
 

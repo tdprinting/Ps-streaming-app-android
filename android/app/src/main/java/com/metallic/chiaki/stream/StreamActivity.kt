@@ -354,12 +354,18 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 	private fun setupVideoOutput() {
 		val prefs = Preferences(this)
 		viewModel.session.detachSurface()
-		val upscale = prefs.upscalingEnabled && VideoRenderer.isUpscalingSupported(this)
+		// Hayai HDR: 10-bit video must reach SurfaceFlinger untouched. The shader paths draw in 8-bit
+		// RGBA, which would clip and mistone it, so an HDR stream always takes the plain SurfaceView.
+		val hdr = isHdrStream()
+		if (hdr && (prefs.debandingEnabled || prefs.upscalingEnabled || prefs.frontBuffer))
+			android.widget.Toast.makeText(this, R.string.stream_hdr_disables_shaders, android.widget.Toast.LENGTH_LONG).show()
+		val upscale = !hdr && prefs.upscalingEnabled && VideoRenderer.isUpscalingSupported(this)
+		val deband = !hdr && prefs.debandingEnabled
 		frontBufferVideo?.release()
 		frontBufferVideo = null
 
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && prefs.frontBuffer
-			&& !prefs.debandingEnabled && !upscale && FrontBufferVideo.isSupported()) {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && prefs.frontBuffer && !hdr
+			&& !deband && !upscale && FrontBufferVideo.isSupported()) {
 			// Hayai tearing mode: the decoder writes into a texture that is drawn straight into the
 			// front buffer the display is scanning out, layered on the plain SurfaceView
 			binding.surfaceView.visibility = View.VISIBLE
@@ -368,7 +374,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			frontBufferVideo = FrontBufferVideo(binding.surfaceView, videoProfile.width, videoProfile.height) { surface ->
 				viewModel.session.attachToSurface(surface)
 			}
-		} else if (prefs.debandingEnabled || upscale) {
+		} else if (deband || upscale) {
 			// Use GLSurfaceView to draw the video through shaders
 			binding.surfaceView.visibility = View.GONE
 			binding.debandSurfaceView.visibility = View.VISIBLE
@@ -378,7 +384,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 				assets.open(VideoRenderer.UPSCALE_SHADER_ASSET).bufferedReader().use { it.readText() }
 			else
 				null
-			videoRenderer = VideoRenderer(videoProfile.width, videoProfile.height, prefs.debandingEnabled,
+			videoRenderer = VideoRenderer(videoProfile.width, videoProfile.height, deband,
 				prefs.sharpnessIntensity, upscaleShader, { binding.debandSurfaceView.requestRender() }) { surface ->
 				viewModel.session.attachToSurface(surface)
 			}
@@ -747,12 +753,33 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			format(R.string.stream_stats_audio,
 				getString(if(stats.audioExclusive) R.string.stream_stats_audio_exclusive else R.string.stream_stats_audio_shared),
 				stats.audioDeviceBufferMs),
+			if(isHdrStream())
+				format(R.string.stream_stats_hdr, getString(
+					if(displayReportsHdr10()) R.string.stream_stats_hdr_on else R.string.stream_stats_hdr_tonemapped))
+			else
+				null,
 			frontBufferVideo?.let {
 				format(R.string.stream_stats_front_buffer, getString(
 					if(it.frontBufferSupported) R.string.stream_stats_front_buffer_on else R.string.stream_stats_front_buffer_unsupported))
 			},
 			thermalStatus()?.let { format(R.string.stream_stats_thermal, thermalStatusText(it)) }
 		).joinToString("\n")
+	}
+
+	/** Hayai: whether this stream is HDR10, which only a PS5 sends */
+	private fun isHdrStream(): Boolean
+	{
+		val connectInfo = viewModel.session.connectInfo
+		return connectInfo.ps5 && connectInfo.videoProfile.codec == com.metallic.chiaki.lib.Codec.CODEC_H265_HDR
+	}
+
+	/** Hayai: whether the display says it can show HDR10, for the statistics */
+	private fun displayReportsHdr10(): Boolean
+	{
+		@Suppress("DEPRECATION")
+		val display = (if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) this.display else windowManager.defaultDisplay)
+			?: return false
+		return display.hdrCapabilities?.supportedHdrTypes?.contains(Display.HdrCapabilities.HDR_TYPE_HDR10) == true
 	}
 
 	/** Hayai: the decoder mode for the statistics */

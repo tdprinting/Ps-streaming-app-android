@@ -219,6 +219,7 @@
     <string name="preferences_bitrate_auto">Auto (%d)</string>
     <string name="preferences_codec_title_h264" translatable="false">H264</string>
     <string name="preferences_codec_title_h265">H265 (PS5 only)</string>
+    <string name="preferences_codec_title_h265_hdr">H265 HDR (PS5 only, needs HDR on the console)</string>
     <string name="preferences_pip_title">Picture-in-picture when leaving</string>
     <string name="preferences_pip_summary">The stream goes on in a small window when you leave the app. Closing the window ends the stream.</string>
     <string name="preferences_quality_title">Quality</string>
@@ -449,6 +450,10 @@
     <string name="stream_stats_front_buffer" translatable="false">Tearing mode: %1$s</string>
     <string name="stream_stats_front_buffer_on">on, drawing straight to the screen</string>
     <string name="stream_stats_front_buffer_unsupported">not supported by this display, using the normal path</string>
+    <string name="stream_stats_hdr" translatable="false">HDR10: %1$s</string>
+    <string name="stream_stats_hdr_on">on, display reports HDR10</string>
+    <string name="stream_stats_hdr_tonemapped">on, but the display doesn\'t report HDR10, so Android tone maps it</string>
+    <string name="stream_hdr_disables_shaders">HDR streams skip debanding, super resolution and tearing mode, which draw in 8-bit color</string>
     <string name="stream_stats_latency" translatable="false">Decoder: %1$s · %2$d stale frames skipped · display %3$.0f Hz</string>
     <string name="stream_stats_decoder_snapdragon">Snapdragon low latency</string>
     <string name="stream_stats_decoder_low_latency">low latency</string>

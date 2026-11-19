@@ -11,6 +11,15 @@
 - [x] Max quality preset (1080p60, 40 Mbit/s)
 - [x] CI builds the APK
 
+## Done (v0.2)
+- [x] Low latency audio: exclusive MMAP stream, 2-burst adaptive device buffer, tighter jitter trim
+- [x] Snapdragon software-fence early decoder output
+- [x] DSCP EF on the stream socket (Wi-Fi WMM priority for input)
+- [x] Network, decoder and audio threads on the fast CPU cores
+- [x] Experimental tearing mode (front buffer rendering)
+- [x] Research: input prediction, reprojection, frame generation (docs/PREDICTION-AND-FRAME-GEN.md)
+- [x] HDR10 streaming (H265 HDR codec, decoder color hints, plain SurfaceView path)
+
 ## Next
 - [ ] **Test on the Odin 2 Portal**: confirm `c2.qti.*.low_latency` starts (see the log / statistics) and that the display stays at 120 Hz
 - [ ] Measure end to end delay with a 240 fps phone camera (button LED or on-screen counter) against Momiji and Sony's app, and record the results in `docs/LATENCY.md`
@@ -18,4 +27,9 @@
 - [ ] ADPF performance hint session for the decode and input threads (Android 13 `APerformanceHint`)
 - [ ] Odin preset button: one tap for all latency settings plus the Max quality preset
 - [ ] Optional: the decoder's own frame-ready callback (async MediaCodec) in place of the blocking output thread
+- [ ] Check whether the Odin 2 Portal reports HDR10 to Android (stats overlay), and measure the decode cost of HDR
+- [ ] HDR-capable (10-bit, RGBA1010102) shader path, so debanding and super resolution work with HDR
+- [ ] Verify tearing mode on the Odin 2 Portal (does its display stack support front buffer usage?)
+- [ ] Research: per-game "camera warp" reprojection from the right stick, calibrated by hand (novelty, artifacts expected)
+- [ ] Research: optional 60→120 fps frame *extrapolation* for smoothness only (never interpolation, which adds a frame of delay)
 - [ ] Regularly merge upstream Momiji releases
