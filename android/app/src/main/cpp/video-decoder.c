@@ -21,6 +21,33 @@
 
 static void *android_chiaki_video_decoder_output_thread_func(void *user);
 
+// Hayai latency options, see video-decoder.h. Written from the UI thread before
+// a session starts, read when a decoder is created.
+static volatile bool latency_skip_stale_frames = true;
+static volatile bool latency_snapdragon_tuning = true;
+
+void android_chiaki_video_decoder_set_latency_options(bool skip_stale_frames,
+                                                      bool snapdragon_tuning) {
+  latency_skip_stale_frames = skip_stale_frames;
+  latency_snapdragon_tuning = snapdragon_tuning;
+}
+
+/** Decoder tiers, from most to least aggressive */
+#define LATENCY_TIER_PLAIN 0
+#define LATENCY_TIER_LOW_LATENCY 1
+#define LATENCY_TIER_SNAPDRAGON 2
+
+static const char *latency_tier_name(int tier) {
+  switch (tier) {
+  case LATENCY_TIER_SNAPDRAGON:
+    return "Snapdragon low latency";
+  case LATENCY_TIER_LOW_LATENCY:
+    return "low latency";
+  default:
+    return "plain";
+  }
+}
+
 ChiakiErrorCode
 android_chiaki_video_decoder_init(AndroidChiakiVideoDecoder *decoder,
                                   ChiakiLog *log, int32_t target_width,
@@ -45,6 +72,8 @@ android_chiaki_video_decoder_init(AndroidChiakiVideoDecoder *decoder,
   decoder->last_sample_us = 0;
   decoder->gap_max_stats_us = 0;
   decoder->gap_max_log_us = 0;
+  decoder->frames_skipped_stale = 0;
+  decoder->latency_tier = LATENCY_TIER_PLAIN;
   return chiaki_mutex_init(&decoder->codec_mutex, false);
 }
 
@@ -82,14 +111,21 @@ void android_chiaki_video_decoder_fini(AndroidChiakiVideoDecoder *decoder) {
 }
 
 static AMediaFormat *create_format(AndroidChiakiVideoDecoder *decoder,
-                                   const char *mime, bool low_latency) {
+                                   const char *mime, int tier) {
   AMediaFormat *format = AMediaFormat_new();
   AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, mime);
   AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_WIDTH, decoder->target_width);
   AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_HEIGHT,
                         decoder->target_height);
-  if (!low_latency)
+  if (tier == LATENCY_TIER_PLAIN)
     return format;
+
+  if (tier >= LATENCY_TIER_SNAPDRAGON) {
+    // Run the video block at its top clock instead of the one the decoder
+    // picks for a 60 fps stream, so every frame is decoded as fast as the
+    // hardware can (KEY_OPERATING_RATE, as Moonlight does on Qualcomm)
+    AMediaFormat_setInt32(format, "operating-rate", 0x7fff);
+  }
 
   // Big enough for a whole keyframe, so a frame is never split across
   // input buffers, which some decoders can't handle
@@ -150,35 +186,64 @@ void android_chiaki_video_decoder_set_surface(
       chiaki_codec_is_h265(decoder->target_codec) ? "video/hevc" : "video/avc";
   CHIAKI_LOGI(decoder->log, "Initializing decoder with mime %s", mime);
 
-  // Try the low latency configuration first and fall back to the plain one
-  // for decoders that reject any of its keys.
+  // Try the most aggressive configuration first and step down for decoders
+  // that don't exist or reject any of its keys:
+  //  1. Qualcomm's dedicated low latency instance (listed as
+  //     c2.qti.*.decoder.low_latency in media_codecs.xml on Snapdragon 8 Gen 1
+  //     and later, the Odin 2's 8 Gen 2 included) with the Snapdragon keys
+  //  2. Qualcomm's regular instance with the same keys
+  //  3. Whatever decoder Android picks, with the generic low latency keys
+  //  4. That decoder without any extra keys
+  bool h265 = chiaki_codec_is_h265(decoder->target_codec);
+  struct {
+    const char *name; // NULL: by mime type
+    int tier;
+  } attempts[] = {
+      {h265 ? "c2.qti.hevc.decoder.low_latency" : "c2.qti.avc.decoder.low_latency",
+       LATENCY_TIER_SNAPDRAGON},
+      {h265 ? "c2.qti.hevc.decoder" : "c2.qti.avc.decoder",
+       LATENCY_TIER_SNAPDRAGON},
+      {NULL, LATENCY_TIER_LOW_LATENCY},
+      {NULL, LATENCY_TIER_PLAIN},
+  };
   media_status_t r = AMEDIA_ERROR_UNKNOWN;
-  for (int low_latency = 1; low_latency >= 0; low_latency--) {
-    decoder->codec = AMediaCodec_createDecoderByType(mime);
+  for (size_t i = 0; i < sizeof(attempts) / sizeof(attempts[0]); i++) {
+    if (attempts[i].name && !latency_snapdragon_tuning)
+      continue;
+    decoder->codec = attempts[i].name
+                         ? AMediaCodec_createCodecByName(attempts[i].name)
+                         : AMediaCodec_createDecoderByType(mime);
     if (!decoder->codec) {
+      if (attempts[i].name) {
+        CHIAKI_LOGI(decoder->log, "Decoder %s not available on this device",
+                    attempts[i].name);
+        continue;
+      }
       CHIAKI_LOGE(decoder->log, "Failed to create AMediaCodec for mime type %s",
                   mime);
       goto error_surface;
     }
 
-    AMediaFormat *format = create_format(decoder, mime, low_latency);
+    AMediaFormat *format = create_format(decoder, mime, attempts[i].tier);
     r = AMediaCodec_configure(decoder->codec, format, decoder->window, NULL, 0);
     if (r == AMEDIA_OK)
       r = AMediaCodec_start(decoder->codec);
     AMediaFormat_delete(format);
     if (r == AMEDIA_OK) {
-      CHIAKI_LOGI(decoder->log, "Video decoder started%s",
-                  low_latency ? " in low latency mode" : "");
+      decoder->latency_tier = attempts[i].tier;
+      CHIAKI_LOGI(decoder->log, "Video decoder %s started in %s mode",
+                  attempts[i].name ? attempts[i].name : "(default)",
+                  latency_tier_name(attempts[i].tier));
       break;
     }
 
-    CHIAKI_LOGE(decoder->log,
-                "Configuring the video decoder%s failed: %d",
-                low_latency ? " in low latency mode" : "", (int)r);
+    CHIAKI_LOGE(decoder->log, "Configuring video decoder %s in %s mode failed: %d",
+                attempts[i].name ? attempts[i].name : "(default)",
+                latency_tier_name(attempts[i].tier), (int)r);
     AMediaCodec_delete(decoder->codec);
     decoder->codec = NULL;
   }
-  if (r != AMEDIA_OK)
+  if (r != AMEDIA_OK || !decoder->codec)
     goto error_surface;
 
   ChiakiErrorCode err = chiaki_thread_create(
@@ -352,12 +417,39 @@ static void *android_chiaki_video_decoder_output_thread_func(void *user) {
   if (chiaki_thread_set_current_nice(-8) != CHIAKI_ERR_SUCCESS)
     CHIAKI_LOGW(decoder->log, "Video decoder failed to raise its output thread's priority");
 
+  bool skip_stale = latency_skip_stale_frames;
+
   while (1) {
     AMediaCodecBufferInfo info;
     ssize_t status = AMediaCodec_dequeueOutputBuffer(decoder->codec, &info, -1);
+    if (status >= 0 && skip_stale && info.size != 0 &&
+        !(info.flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM)) {
+      // Newest frame wins: if the decoder already has a later picture ready,
+      // drop this one instead of putting both on the display one vsync after
+      // the other, which would show the later one a whole refresh late.
+      while (1) {
+        AMediaCodecBufferInfo next_info;
+        ssize_t next =
+            AMediaCodec_dequeueOutputBuffer(decoder->codec, &next_info, 0);
+        if (next < 0)
+          break; // nothing newer (or a format/buffers change, handled below)
+        AMediaCodec_releaseOutputBuffer(decoder->codec, (size_t)status, false);
+        __atomic_add_fetch(&decoder->frames_skipped_stale, 1, __ATOMIC_RELAXED);
+        status = next;
+        info = next_info;
+        if (info.size == 0 || (info.flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM))
+          break;
+      }
+    }
     if (status >= 0) {
-      AMediaCodec_releaseOutputBuffer(decoder->codec, (size_t)status,
-                                      info.size != 0);
+      if (info.size != 0)
+        // Show it at the very next vsync. With an explicit time in the past,
+        // SurfaceFlinger also picks the newest due frame if more than one
+        // is waiting, instead of showing them one per refresh.
+        AMediaCodec_releaseOutputBufferAtTime(decoder->codec, (size_t)status,
+                                              (int64_t)chiaki_time_now_monotonic_us() * 1000);
+      else
+        AMediaCodec_releaseOutputBuffer(decoder->codec, (size_t)status, false);
       if (info.size != 0) {
         __atomic_add_fetch(&decoder->frames_rendered, 1, __ATOMIC_RELAXED);
         track_latency(decoder, (uint64_t)info.presentationTimeUs);

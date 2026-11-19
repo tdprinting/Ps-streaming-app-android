@@ -23,11 +23,13 @@ class StreamInput(val context: Context, val preferences: Preferences)
 	var lastControllerDeviceId: Int? = null
 		private set
 
+	// Hayai: looked up once instead of on every input event
+	private val windowManager by lazy { context.getSystemService(Context.WINDOW_SERVICE) as WindowManager }
+
 	val controllerState: ControllerState get()
 	{
 		val controllerState = sensorControllerState or keyControllerState or motionControllerState or touchpadControllerState
 
-		val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 		@Suppress("DEPRECATION")
 		when(windowManager.defaultDisplay.rotation)
 		{

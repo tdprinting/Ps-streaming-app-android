@@ -1,0 +1,42 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # protoc + the protobuf Python module generate the Takion protocol code with nanopb
+      - name: Install protobuf tools
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler python3-protobuf
+
+      - name: Install NDK and CMake
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;26.1.10909125" "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK (fdroid flavor, arm64 is what the Odin 2 Portal needs)
+        working-directory: android
+        run: ./gradlew --no-daemon assembleFdroidDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hayai-debug-apk
+          path: android/app/build/outputs/apk/fdroid/debug/*.apk
+          if-no-files-found: error

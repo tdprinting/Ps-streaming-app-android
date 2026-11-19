@@ -26,11 +26,11 @@ android {
     compileSdk 36
     ndkVersion '26.1.10909125'
     defaultConfig {
-        applicationId "io.github.yazanj082.momiji"
+        applicationId "com.tdprinting.hayai"
         minSdk 24
         targetSdk 36
-        versionCode 25
-        versionName "1.1.3"
+        versionCode 1
+        versionName "0.1.0-momiji-1.1.3"
         externalNativeBuild {
             cmake {
                 // Reproducible builds: no build machine paths in the native code (e.g. from __FILE__),

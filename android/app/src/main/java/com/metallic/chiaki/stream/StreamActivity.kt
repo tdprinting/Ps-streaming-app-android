@@ -40,6 +40,7 @@ import com.metallic.chiaki.common.ext.viewModelFactory
 import com.metallic.chiaki.databinding.ActivityStreamBinding
 import com.metallic.chiaki.lib.ConnectInfo
 import com.metallic.chiaki.lib.ConnectVideoProfile
+import com.metallic.chiaki.lib.LatencyOptions
 import com.metallic.chiaki.main.MainActivity
 import com.metallic.chiaki.session.*
 import com.metallic.chiaki.touchcontrols.DefaultTouchControlsFragment
@@ -93,6 +94,9 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			return
 		}
 
+		// Hayai: read by the native video decoder when it is created for this stream
+		Preferences(this).let { LatencyOptions.apply(it.skipStaleFrames, it.snapdragonTuning) }
+
 		viewModel = ViewModelProvider(this, viewModelFactory {
 			StreamViewModel(application, connectInfo)
 		})[StreamViewModel::class.java]
@@ -115,12 +119,17 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		// Ask TVs to switch to their low latency game mode (ALLM) over HDMI
 		if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
 			window.setPreferMinimalPostProcessing(true)
-		// Steady clocks instead of full speed until the phone gets hot and throttles hard
-		if((getSystemService(POWER_SERVICE) as PowerManager).isSustainedPerformanceModeSupported)
+		// Steady clocks instead of full speed until the phone gets hot and throttles hard.
+		// Hayai: optional, off on AYN handhelds, whose fan lets the clocks stay at full speed.
+		if(Preferences(this).sustainedPerformance
+			&& (getSystemService(POWER_SERVICE) as PowerManager).isSustainedPerformanceModeSupported)
 			window.setSustainedPerformanceMode(true)
+		// Hayai: ask for the display's fastest mode (120 Hz on the Odin 2 Portal) before the first frame
+		requestRefreshModeForWindow()
 
 		binding = ActivityStreamBinding.inflate(layoutInflater)
 		setContentView(binding.root)
+		requestUnbufferedInput()
 		window.decorView.setOnSystemUiVisibilityChangeListener(this)
 
 		viewModel.onScreenControlsVisible.observe(this, Observer {
@@ -152,8 +161,8 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		// The display shows whichever of the two views the video goes to
 		val frameRateCallback = object: SurfaceHolder.Callback
 		{
-			override fun surfaceCreated(holder: SurfaceHolder) = matchStreamFrameRate(holder.surface)
-			override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
+			override fun surfaceCreated(holder: SurfaceHolder) = applyRefreshMode(holder.surface)
+			override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = applyRefreshMode(holder.surface)
 			override fun surfaceDestroyed(holder: SurfaceHolder) {}
 		}
 		binding.surfaceView.holder.addCallback(frameRateCallback)
@@ -243,6 +252,82 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 
 	/** Draws the video through shaders, when debanding or super resolution is on */
 	private var videoRenderer: VideoRenderer? = null
+
+	/**
+	 * Hayai: the display's modes at the current resolution with the highest refresh rate, e.g. the
+	 * Odin 2 Portal's 120 Hz mode. Null when there is no faster mode than the current one to pick.
+	 */
+	private fun fastestDisplayMode(): Display.Mode?
+	{
+		if(Build.VERSION.SDK_INT < Build.VERSION_CODES.M)
+			return null
+		@Suppress("DEPRECATION")
+		val display = (if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) this.display else windowManager.defaultDisplay)
+			?: return null
+		val current = display.mode
+		return display.supportedModes
+			.filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
+			.maxByOrNull { it.refreshRate }
+	}
+
+	/** The refresh rate the display runs at during the stream, for the statistics */
+	private fun currentRefreshRate(): Float
+	{
+		@Suppress("DEPRECATION")
+		val display = (if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) this.display else windowManager.defaultDisplay)
+		return display?.refreshRate ?: 0f
+	}
+
+	/**
+	 * Hayai: in [Preferences.RefreshMode.MAX], pins the window to the display's fastest mode.
+	 *
+	 * The PS5 sends 60 fps, but on a 120 Hz screen a decoded frame waits at most 8.3 ms for the next
+	 * refresh instead of 16.7 ms, about 4 ms less on average, and the panel scans it out in half the
+	 * time. Input batching and the system UI also run on the faster clock.
+	 */
+	private fun requestRefreshModeForWindow()
+	{
+		if(Preferences(this).refreshMode != Preferences.RefreshMode.MAX)
+			return
+		val mode = fastestDisplayMode() ?: return
+		window.attributes = window.attributes.also { it.preferredDisplayModeId = mode.modeId }
+	}
+
+	/**
+	 * Hayai: tells the system which rate the video surface wants, by the refresh mode setting.
+	 * MAX asks for the fastest rate without claiming a fixed frame rate, so it isn't lowered to 60 Hz
+	 * for a 60 fps stream; MATCH is Momiji's original behavior.
+	 */
+	private fun applyRefreshMode(surface: Surface)
+	{
+		when(Preferences(this).refreshMode)
+		{
+			Preferences.RefreshMode.MAX ->
+			{
+				if(Build.VERSION.SDK_INT < Build.VERSION_CODES.R || !surface.isValid)
+					return
+				val rate = fastestDisplayMode()?.refreshRate ?: return
+				surface.setFrameRate(rate, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+			}
+			Preferences.RefreshMode.MATCH -> matchStreamFrameRate(surface)
+			Preferences.RefreshMode.SYSTEM -> {}
+		}
+	}
+
+	/**
+	 * Hayai: Android hands stick and trigger moves (MotionEvents) to apps once per vsync, batched.
+	 * Unbuffered dispatch delivers each one as it arrives, so it goes out to the console right away
+	 * instead of up to a refresh later. Buttons (KeyEvents) are never batched.
+	 */
+	private fun requestUnbufferedInput()
+	{
+		if(Build.VERSION.SDK_INT < Build.VERSION_CODES.R || !Preferences(this).unbufferedInput)
+			return
+		val sources = InputDevice.SOURCE_CLASS_JOYSTICK or InputDevice.SOURCE_CLASS_BUTTON
+		// Generic motion events go to the focused view, which can be any of these
+		listOf(window.decorView, binding.root, binding.surfaceView, binding.debandSurfaceView)
+			.forEach { it.requestUnbufferedDispatch(sources) }
+	}
 
 	/**
 	 * Lets the display run at a rate that fits the stream, for example 60 or 120 Hz instead of 90 Hz,
@@ -639,9 +724,19 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			format(R.string.stream_stats_network, stats.bitrateMbps, stats.packetLoss * 100f, stats.pingMs),
 			format(R.string.stream_stats_decode, stats.decodeMsAverage, stats.decodeMsMax),
 			format(R.string.stream_stats_timing, stats.frameGapMsMax, stats.audioBufferMs),
+			format(R.string.stream_stats_latency, decoderTierText(stats.decoderLatencyTier),
+				stats.framesSkippedStale, currentRefreshRate()),
 			thermalStatus()?.let { format(R.string.stream_stats_thermal, thermalStatusText(it)) }
 		).joinToString("\n")
 	}
+
+	/** Hayai: the decoder mode for the statistics */
+	private fun decoderTierText(tier: Int) = getString(when(tier)
+	{
+		2 -> R.string.stream_stats_decoder_snapdragon
+		1 -> R.string.stream_stats_decoder_low_latency
+		else -> R.string.stream_stats_decoder_plain
+	})
 
 	/** How hot the phone is, from PowerManager.THERMAL_STATUS_NONE up, on Android 10 and later */
 	private fun thermalStatus(): Int? =

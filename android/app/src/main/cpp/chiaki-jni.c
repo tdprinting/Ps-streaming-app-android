@@ -768,7 +768,7 @@ JNIEXPORT void JNICALL JNI_FCN(sessionGetStats)(JNIEnv *env, jobject obj, jlong 
 	uint64_t lost_new = lost - session->stats_lost;
 	session->stats_received = received;
 	session->stats_lost = lost;
-	jfloat stats[8] = {
+	jfloat stats[10] = {
 		(jfloat)session->session.stream_connection.measured_bitrate,
 		received_new + lost_new > 0 ? (jfloat)lost_new / (jfloat)(received_new + lost_new) : 0.0f,
 		(jfloat)(session->session.rtt_us / 1000.0),
@@ -776,9 +776,18 @@ JNIEXPORT void JNICALL JNI_FCN(sessionGetStats)(JNIEnv *env, jobject obj, jlong 
 		(jfloat)(__atomic_load_n(&decoder->stats_latency_avg_us, __ATOMIC_RELAXED) / 1000.0),
 		(jfloat)(__atomic_load_n(&decoder->stats_latency_max_us, __ATOMIC_RELAXED) / 1000.0),
 		(jfloat)(__atomic_exchange_n(&decoder->gap_max_stats_us, 0, __ATOMIC_RELAXED) / 1000.0),
-		(jfloat)android_chiaki_audio_output_buffered_ms(session->audio_output)
+		(jfloat)android_chiaki_audio_output_buffered_ms(session->audio_output),
+		// Hayai
+		(jfloat)__atomic_load_n(&decoder->frames_skipped_stale, __ATOMIC_RELAXED),
+		(jfloat)decoder->latency_tier
 	};
-	E->SetFloatArrayRegion(env, stats_array, 0, 8, stats);
+	E->SetFloatArrayRegion(env, stats_array, 0, 10, stats);
+}
+
+/** Hayai latency options for decoders created from now on, see video-decoder.h */
+JNIEXPORT void JNICALL JNI_FCN(setLatencyOptions)(JNIEnv *env, jobject obj, jboolean skip_stale_frames, jboolean snapdragon_tuning)
+{
+	android_chiaki_video_decoder_set_latency_options(skip_stale_frames, snapdragon_tuning);
 }
 
 /** Writes a line from the app into the session's log, e.g. what the phone did during the stream */

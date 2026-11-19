@@ -163,6 +163,43 @@
             app:icon="@drawable/ic_super_resolution" />
     </PreferenceCategory>
 
+    <!-- Hayai: everything that trades smoothness or battery for less delay -->
+    <PreferenceCategory
+        app:key="category_latency"
+        app:title="@string/preferences_category_title_latency">
+        <ListPreference
+            app:key="latency_refresh_mode"
+            app:title="@string/preferences_refresh_mode_title"
+            app:entries="@array/preferences_refresh_mode_entries"
+            app:entryValues="@array/preferences_refresh_mode_values"
+            app:summary="%s"
+            app:icon="@drawable/ic_fps"/>
+
+        <SwitchPreference
+            app:key="latency_unbuffered_input"
+            app:title="@string/preferences_unbuffered_input_title"
+            app:summary="@string/preferences_unbuffered_input_summary"
+            app:icon="@drawable/ic_fps" />
+
+        <SwitchPreference
+            app:key="latency_skip_stale_frames"
+            app:title="@string/preferences_skip_stale_frames_title"
+            app:summary="@string/preferences_skip_stale_frames_summary"
+            app:icon="@drawable/ic_fps" />
+
+        <SwitchPreference
+            app:key="latency_snapdragon_tuning"
+            app:title="@string/preferences_snapdragon_tuning_title"
+            app:summary="@string/preferences_snapdragon_tuning_summary"
+            app:icon="@drawable/ic_codec" />
+
+        <SwitchPreference
+            app:key="latency_sustained_performance"
+            app:title="@string/preferences_sustained_performance_title"
+            app:summary="@string/preferences_sustained_performance_summary"
+            app:icon="@drawable/ic_fps" />
+    </PreferenceCategory>
+
     <PreferenceCategory
         app:key="category_export"
         app:title="@string/preferences_category_title_export">

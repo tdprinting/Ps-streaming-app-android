@@ -48,7 +48,27 @@ typedef struct android_chiaki_video_decoder_t {
   uint64_t last_sample_us;
   uint32_t gap_max_stats_us;
   uint32_t gap_max_log_us;
+
+  // Hayai: decoded frames that were skipped because a newer one was already
+  // decoded. Read from other threads with __atomic_load_n.
+  uint32_t frames_skipped_stale;
+  // Hayai: 0 plain, 1 generic low latency keys, 2 Snapdragon tuned (see
+  // video-decoder.c), for the log and the statistics overlay
+  int32_t latency_tier;
 } AndroidChiakiVideoDecoder;
+
+/**
+ * Hayai latency options, set from Kotlin before a session starts and read when
+ * the decoder is created.
+ *
+ * skip_stale_frames: when the decoder has more than one frame ready (after a
+ *   burst from the network), show only the newest one instead of queueing them
+ *   all behind each other on the display.
+ * snapdragon_tuning: try Qualcomm's dedicated low latency decoder instance and
+ *   its vendor keys first.
+ */
+void android_chiaki_video_decoder_set_latency_options(bool skip_stale_frames,
+                                                      bool snapdragon_tuning);
 
 ChiakiErrorCode
 android_chiaki_video_decoder_init(AndroidChiakiVideoDecoder *decoder,

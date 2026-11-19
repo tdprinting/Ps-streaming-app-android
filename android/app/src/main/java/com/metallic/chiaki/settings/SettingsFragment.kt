@@ -50,6 +50,10 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 		preferences.touchscreenTouchpadEnabledKey -> preferences.touchscreenTouchpadEnabled
 		preferences.secondScreenKey -> preferences.secondScreen
 		preferences.pictureInPictureKey -> preferences.pictureInPicture
+		preferences.unbufferedInputKey -> preferences.unbufferedInput
+		preferences.skipStaleFramesKey -> preferences.skipStaleFrames
+		preferences.snapdragonTuningKey -> preferences.snapdragonTuning
+		preferences.sustainedPerformanceKey -> preferences.sustainedPerformance
 		else -> defValue
 	}
 
@@ -68,6 +72,10 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 			preferences.touchscreenTouchpadEnabledKey -> preferences.touchscreenTouchpadEnabled = value
 			preferences.secondScreenKey -> preferences.secondScreen = value
 			preferences.pictureInPictureKey -> preferences.pictureInPicture = value
+			preferences.unbufferedInputKey -> preferences.unbufferedInput = value
+			preferences.skipStaleFramesKey -> preferences.skipStaleFrames = value
+			preferences.snapdragonTuningKey -> preferences.snapdragonTuning = value
+			preferences.sustainedPerformanceKey -> preferences.sustainedPerformance = value
 		}
 	}
 
@@ -82,6 +90,7 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 		key == preferences.fpsKey -> preferences.fps.value
 		key == preferences.bitrateKey -> preferences.bitrate?.toString() ?: ""
 		key == preferences.codecKey -> preferences.codec.value
+		key == preferences.refreshModeKey -> preferences.refreshMode.value
 		else -> defValue
 	}
 
@@ -101,6 +110,8 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 				preferences.fps = fps
 			}
 			key == preferences.bitrateKey -> preferences.bitrate = value?.toIntOrNull()
+			key == preferences.refreshModeKey ->
+				preferences.refreshMode = Preferences.RefreshMode.fromValue(value) ?: return
 			key == preferences.codecKey ->
 			{
 				val codec = Preferences.Codec.values().firstOrNull { it.value == value } ?: return

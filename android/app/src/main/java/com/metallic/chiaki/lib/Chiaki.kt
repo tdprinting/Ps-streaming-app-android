@@ -103,6 +103,7 @@ private class ChiakiNative
 		@JvmStatic external fun sessionSetLoginPin(ptr: Long, pin: String)
 		@JvmStatic external fun sessionGotoBed(ptr: Long): Int
 		@JvmStatic external fun sessionGetStats(ptr: Long, stats: FloatArray)
+		@JvmStatic external fun setLatencyOptions(skipStaleFrames: Boolean, snapdragonTuning: Boolean)
 		@JvmStatic external fun sessionLogInfo(ptr: Long, text: String)
 		@JvmStatic external fun holepunchListDevices(result: CreateResult, token: String, ps5: Boolean): Array<HolepunchDevice>?
 		@JvmStatic external fun holepunchCreate(token: String, logFile: String?, logVerbose: Boolean): Long
@@ -490,8 +491,19 @@ data class StreamStats(
 	/** The longest wait between two frames from the network since the last call */
 	val frameGapMsMax: Float,
 	/** The audio buffer's lowest level over the last few seconds */
-	val audioBufferMs: Float
+	val audioBufferMs: Float,
+	/** Hayai: decoded frames skipped because a newer one was ready, since the session started */
+	val framesSkippedStale: Long = 0,
+	/** Hayai: 0 plain, 1 low latency, 2 Snapdragon low latency decoder */
+	val decoderLatencyTier: Int = 0
 )
+
+/** Hayai: latency options that apply to sessions created from now on */
+object LatencyOptions
+{
+	fun apply(skipStaleFrames: Boolean, snapdragonTuning: Boolean) =
+		ChiakiNative.setLatencyOptions(skipStaleFrames, snapdragonTuning)
+}
 
 /**
  * @param holepunch a connection through PSN that the session takes over, with its log instead of logFile
@@ -624,9 +636,10 @@ class Session(connectInfo: ConnectInfo, logFile: String?, logVerbose: Boolean,
 
 	fun getStats(): StreamStats?
 	{
-		val stats = FloatArray(8)
+		val stats = FloatArray(10)
 		withNative { ChiakiNative.sessionGetStats(it, stats) } ?: return null
-		return StreamStats(stats[0], stats[1], stats[2], stats[3].toLong(), stats[4], stats[5], stats[6], stats[7])
+		return StreamStats(stats[0], stats[1], stats[2], stats[3].toLong(), stats[4], stats[5], stats[6], stats[7],
+			stats[8].toLong(), stats[9].toInt())
 	}
 
 	/**

@@ -48,6 +48,8 @@ class Preferences(context: Context)
 		SMOOTH("smooth", R.string.quality_smooth, R.string.quality_smooth_summary),
 		BALANCED("balanced", R.string.quality_balanced, R.string.quality_balanced_summary),
 		SHARP("sharp", R.string.quality_sharp, R.string.quality_sharp_summary),
+		/** Hayai: the most a PS5 encodes, for a strong local network such as Wi-Fi 6E */
+		MAX("max", R.string.quality_max, R.string.quality_max_summary),
 		CUSTOM("custom", R.string.quality_custom, R.string.quality_custom_summary);
 
 		companion object
@@ -64,6 +66,8 @@ class Preferences(context: Context)
 		/** A PS4 Pro can't stream much more */
 		private const val SHARP_BITRATE_PS4 = 15000
 		private const val SHARP_BITRATE_PS5 = 25000
+		/** Hayai: 1080p60 at 40 Mbit/s, comfortably inside a 6 GHz Wi-Fi link 20 feet from the router */
+		private const val MAX_BITRATE_PS5 = 40000
 		val qualityAwayDefault = Quality.SMOOTH
 		val fpsDefault = FPS.FPS_60
 		val fpsAll = FPS.values()
@@ -89,7 +93,63 @@ class Preferences(context: Context)
 	val isTv = !packageManager.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)
 			|| packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
 
-	private val resolutionDefault = if(isTv) Resolution.RES_1080P else Resolution.RES_720P
+	/**
+	 * Hayai: AYN's Android handhelds (Odin 2, Odin 2 Portal, Odin 2 Mini, Thor), which have a
+	 * fan, a 1080p screen and, on the Portal, a 120 Hz OLED. Only used to pick defaults.
+	 */
+	val isAynHandheld = android.os.Build.MANUFACTURER.equals("AYN", ignoreCase = true)
+			|| android.os.Build.BRAND.equals("AYN", ignoreCase = true)
+
+	private val resolutionDefault = if(isTv || isAynHandheld) Resolution.RES_1080P else Resolution.RES_720P
+
+
+	/** Hayai: how the display's refresh rate is chosen while streaming */
+	enum class RefreshMode(val value: String)
+	{
+		/** The highest rate the display has, e.g. 120 Hz: a new frame waits at most one short refresh */
+		MAX("max"),
+		/** The stream's own rate (60 Hz), every frame shown for the same time, as Momiji does */
+		MATCH("match"),
+		/** Leave it to the system */
+		SYSTEM("system");
+
+		companion object
+		{
+			fun fromValue(value: String?) = values().firstOrNull { it.value == value }
+		}
+	}
+
+	val refreshModeKey get() = "latency_refresh_mode"
+	var refreshMode: RefreshMode
+		get() = RefreshMode.fromValue(sharedPreferences.getString(refreshModeKey, null)) ?: RefreshMode.MAX
+		set(value) { sharedPreferences.edit().putString(refreshModeKey, value.value).apply() }
+
+	/** Hayai: View.requestUnbufferedDispatch, so stick and trigger moves don't wait for the next vsync */
+	val unbufferedInputKey get() = "latency_unbuffered_input"
+	var unbufferedInput
+		get() = sharedPreferences.getBoolean(unbufferedInputKey, true)
+		set(value) { sharedPreferences.edit().putBoolean(unbufferedInputKey, value).apply() }
+
+	/** Hayai: show only the newest decoded frame after a burst from the network */
+	val skipStaleFramesKey get() = "latency_skip_stale_frames"
+	var skipStaleFrames
+		get() = sharedPreferences.getBoolean(skipStaleFramesKey, true)
+		set(value) { sharedPreferences.edit().putBoolean(skipStaleFramesKey, value).apply() }
+
+	/** Hayai: Qualcomm's dedicated low latency decoder and top video clock */
+	val snapdragonTuningKey get() = "latency_snapdragon_tuning"
+	var snapdragonTuning
+		get() = sharedPreferences.getBoolean(snapdragonTuningKey, true)
+		set(value) { sharedPreferences.edit().putBoolean(snapdragonTuningKey, value).apply() }
+
+	/**
+	 * Hayai: Android's sustained performance mode holds clocks below their peak so a fanless phone
+	 * doesn't throttle. The Odin's fan keeps it cool, so there it is off by default for full clocks.
+	 */
+	val sustainedPerformanceKey get() = "latency_sustained_performance"
+	var sustainedPerformance
+		get() = sharedPreferences.getBoolean(sustainedPerformanceKey, !isAynHandheld)
+		set(value) { sharedPreferences.edit().putBoolean(sustainedPerformanceKey, value).apply() }
 
 	val discoveryEnabledKey get() = resources.getString(R.string.preferences_discovery_enabled_key)
 	var discoveryEnabled
@@ -237,7 +297,8 @@ class Preferences(context: Context)
 	var quality: Quality
 		get() = Quality.fromValue(sharedPreferences.getString(qualityKey, null))
 			// The details someone set before there were presets stay as they are
-			?: if(listOf(resolutionKey, fpsKey, bitrateKey).any { sharedPreferences.contains(it) }) Quality.CUSTOM else Quality.BALANCED
+			?: if(listOf(resolutionKey, fpsKey, bitrateKey).any { sharedPreferences.contains(it) }) Quality.CUSTOM
+				else if(isAynHandheld) Quality.MAX else Quality.BALANCED
 		set(value) { sharedPreferences.edit().putString(qualityKey, value.value).apply() }
 
 	/** For playing away from home, where the network is usually slower. Custom has the same values as at home. */
@@ -281,6 +342,8 @@ class Preferences(context: Context)
 		Quality.BALANCED -> ConnectVideoProfile.preset(resolutionDefault.preset, FPS.FPS_60.preset, codec.codec)
 		Quality.SHARP -> ConnectVideoProfile.preset(Resolution.RES_1080P.preset, FPS.FPS_60.preset, codec.codec)
 			.copy(bitrate = if(ps5) SHARP_BITRATE_PS5 else SHARP_BITRATE_PS4)
+		Quality.MAX -> ConnectVideoProfile.preset(Resolution.RES_1080P.preset, FPS.FPS_60.preset, codec.codec)
+			.copy(bitrate = if(ps5) MAX_BITRATE_PS5 else SHARP_BITRATE_PS4)
 		Quality.CUSTOM -> videoProfileDefaultBitrate.let {
 			val bitrate = bitrate
 			if(bitrate == null)
