@@ -108,6 +108,7 @@ private class ChiakiNative
 			inputRedundancy: Boolean)
 		@JvmStatic external fun sessionGetHealth(ptr: Long, health: FloatArray)
 		@JvmStatic external fun setControllerOnly(enabled: Boolean)
+		@JvmStatic external fun sessionGetReport(ptr: Long, report: FloatArray)
 		@JvmStatic external fun sessionLogInfo(ptr: Long, text: String)
 		@JvmStatic external fun holepunchListDevices(result: CreateResult, token: String, ps5: Boolean): Array<HolepunchDevice>?
 		@JvmStatic external fun holepunchCreate(token: String, logFile: String?, logVerbose: Boolean): Long
@@ -508,6 +509,19 @@ data class StreamStats(
 	val kernelDrops: Long = 0
 )
 
+/** TS5: totals over a whole session, see Session.getReport */
+data class StreamReport(
+	val framesShown: Long,
+	val decodeAvgMs: Float,
+	val decodeMaxMs: Float,
+	val framesSkippedStale: Long,
+	val packetsReceived: Long,
+	val packetsLost: Long,
+	val kernelDrops: Long,
+	val stutters: Long,
+	val pingMs: Float
+)
+
 /** TS5: latency options that apply to sessions created from now on */
 object LatencyOptions
 {
@@ -655,6 +669,15 @@ class Session(connectInfo: ConnectInfo, logFile: String?, logVerbose: Boolean,
 		val health = FloatArray(2)
 		withNative { ChiakiNative.sessionGetHealth(it, health) } ?: return null
 		return Pair(health[0], health[1])
+	}
+
+	/** TS5: totals over the whole session, for the report when the stream ends */
+	fun getReport(): StreamReport?
+	{
+		val r = FloatArray(9)
+		withNative { ChiakiNative.sessionGetReport(it, r) } ?: return null
+		return StreamReport(r[0].toLong(), r[1], r[2], r[3].toLong(), r[4].toLong(), r[5].toLong(),
+			r[6].toLong(), r[7].toLong(), r[8])
 	}
 
 	fun getStats(): StreamStats?

@@ -104,11 +104,19 @@ class StreamInput(val context: Context, val preferences: Preferences)
 	private var ageCount = 0
 	private var ageMaxMs = 0L
 
+	// TS5 stream report: the same over the whole session, never reset
+	var ageTotalMs = 0L
+		private set
+	var ageTotalCount = 0L
+		private set
+
 	private fun recordAge(event: InputEvent)
 	{
 		val age = android.os.SystemClock.uptimeMillis() - event.eventTime
 		if(age < 0 || age > 1000)
 			return
+		ageTotalMs += age
+		ageTotalCount++
 		ageSumMs += age
 		ageCount++
 		if(age > ageMaxMs)

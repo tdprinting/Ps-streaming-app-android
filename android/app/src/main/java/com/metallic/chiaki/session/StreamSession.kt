@@ -58,6 +58,8 @@ class StreamSession(val connectInfo: ConnectInfo, val logManager: LogManager, va
 	fun stats() = session?.getStats()
 	/** TS5: packet loss and longest frame gap since the last call, see Session.getHealth */
 	fun health() = session?.getHealth()
+	/** TS5: totals over the whole session */
+	fun report() = session?.getReport()
 	fun logInfo(text: String) = session?.logInfo(text)
 
 	private val _state = MutableLiveData<StreamState>(StreamStateIdle)

@@ -597,9 +597,52 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		}
 	}
 
+	/** TS5: when the stream started, for the report */
+	private val streamStartMs = android.os.SystemClock.elapsedRealtime()
+	private var reportShown = false
+
+	/**
+	 * TS5 stream report: totals over the whole session, shown as the stream closes and kept for
+	 * the setup check, so changes to the setup can be compared from one session to the next
+	 */
+	private fun showStreamReport()
+	{
+		if(reportShown)
+			return
+		reportShown = true
+		val r = viewModel.session.report() ?: return
+		val minutes = (android.os.SystemClock.elapsedRealtime() - streamStartMs) / 60000f
+		if(minutes < 0.5f || r.framesShown < 300)
+			return
+		val input = viewModel.input
+		val inputMs = if(input.ageTotalCount > 0) input.ageTotalMs.toFloat() / input.ageTotalCount else null
+		val total = r.packetsReceived + r.packetsLost
+		val lossPercent = if(total > 0) r.packetsLost * 100f / total else 0f
+		val lines = mutableListOf<String>()
+		lines.add(String.format(Locale.ROOT, "Last stream · %.0f min · %d frames", minutes, r.framesShown))
+		lines.add(String.format(Locale.ROOT, "Decode %.1f ms (longest %.0f)", r.decodeAvgMs, r.decodeMaxMs) +
+				(inputMs?.let { String.format(Locale.ROOT, " · controller to app %.1f ms", it) } ?: "") +
+				String.format(Locale.ROOT, " · ping %.0f ms", r.pingMs))
+		lines.add(String.format(Locale.ROOT, "Packet loss %.2f%% · %d stutters · %d dropped by this device · %d late frames skipped",
+			lossPercent, r.stutters, r.kernelDrops, r.framesSkippedStale))
+		val stuttersPerMinute = r.stutters / minutes
+		lines.add(when
+		{
+			lossPercent > 1f || stuttersPerMinute > 1f -> "Tip: the network struggled. Check the Wi-Fi band and signal in the setup check, or lower the quality."
+			r.kernelDrops > 0 -> "Tip: this device dropped packets while busy. Fast CPU cores only and battery saver off help."
+			r.decodeAvgMs > 8f -> "Tip: decoding was slow. Snapdragon decoder tuning and H265 (not HDR) decode fastest."
+			else -> "A clean stream."
+		})
+		val text = lines.joinToString("\n")
+		Preferences(this).lastStreamReport = text
+		android.widget.Toast.makeText(applicationContext, text, android.widget.Toast.LENGTH_LONG).show()
+	}
+
 	override fun onPause()
 	{
 		super.onPause()
+		if(isFinishing)
+			showStreamReport()
 		stopDirectInput()
 		viewModel.input.menuComboCallback = null
 		(getSystemService(INPUT_SERVICE) as InputManager).unregisterInputDeviceListener(inputDeviceListener)

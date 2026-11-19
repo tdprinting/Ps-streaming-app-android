@@ -50,6 +50,12 @@ typedef struct android_chiaki_video_decoder_t {
   uint32_t gap_max_log_us;
   // TS5: the same for the poor connection warning
   uint32_t gap_max_health_us;
+  // TS5 stream report, over the whole session: decode time sum, count and maximum, and video
+  // gaps of 50 ms or more (stutters), read when the stream ends
+  uint64_t report_sum_us;
+  uint32_t report_count;
+  uint32_t report_max_us;
+  uint32_t report_stutters;
   // TS5: decoded frames that were skipped because a newer one was already
   // decoded. Read from other threads with __atomic_load_n.
   uint32_t frames_skipped_stale;

@@ -199,6 +199,11 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getBoolean(controllerOnlyKey, false)
 		set(value) { sharedPreferences.edit().putBoolean(controllerOnlyKey, value).apply() }
 
+	/** TS5: the report of the last stream, shown in the setup check */
+	var lastStreamReport: String?
+		get() = sharedPreferences.getString("last_stream_report", null)
+		set(value) { sharedPreferences.edit().putString("last_stream_report", value).apply() }
+
 	/** TS5: whether the setup check has opened by itself once, on the first launch */
 	var setupCheckShown
 		get() = sharedPreferences.getBoolean("setup_check_shown", false)

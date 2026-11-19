@@ -133,6 +133,10 @@ android_chiaki_video_decoder_init(AndroidChiakiVideoDecoder *decoder,
   decoder->gap_max_stats_us = 0;
   decoder->gap_max_log_us = 0;
   decoder->gap_max_health_us = 0;
+  decoder->report_sum_us = 0;
+  decoder->report_count = 0;
+  decoder->report_max_us = 0;
+  decoder->report_stutters = 0;
   decoder->frames_skipped_stale = 0;
   decoder->latency_tier = LATENCY_TIER_PLAIN;
   return chiaki_mutex_init(&decoder->codec_mutex, false);
@@ -394,6 +398,8 @@ bool android_chiaki_video_decoder_video_sample(uint8_t *buf, size_t buf_size,
     raise_gap_max(&decoder->gap_max_stats_us, gap_us);
     raise_gap_max(&decoder->gap_max_log_us, gap_us);
     raise_gap_max(&decoder->gap_max_health_us, gap_us);
+    if (gap_us >= 50000)
+      __atomic_add_fetch(&decoder->report_stutters, 1, __ATOMIC_RELAXED);
   }
   decoder->last_sample_us = now;
   chiaki_mutex_lock(&decoder->codec_mutex);
@@ -457,6 +463,12 @@ static void track_latency(AndroidChiakiVideoDecoder *decoder,
     return;
   uint64_t latency = chiaki_time_now_monotonic_us() - queued;
 
+  // TS5 stream report
+  __atomic_add_fetch(&decoder->report_sum_us, latency, __ATOMIC_RELAXED);
+  __atomic_add_fetch(&decoder->report_count, 1, __ATOMIC_RELAXED);
+  if (latency > __atomic_load_n(&decoder->report_max_us, __ATOMIC_RELAXED))
+    __atomic_store_n(&decoder->report_max_us, latency > UINT32_MAX ? UINT32_MAX : (uint32_t)latency,
+                     __ATOMIC_RELAXED);
   decoder->stats_sum_us += latency;
   if (latency > decoder->stats_max_us)
     decoder->stats_max_us = latency;

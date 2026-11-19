@@ -826,6 +826,32 @@ JNIEXPORT void JNICALL JNI_FCN(sessionGetHealth)(JNIEnv *env, jobject obj, jlong
 	E->SetFloatArrayRegion(env, health_array, 0, 2, health);
 }
 
+/**
+ * TS5 stream report, totals over the whole session: [0] frames shown, [1] average and [2] longest
+ * decode time in ms, [3] stale frames skipped, [4] packets received, [5] packets lost, [6] packets
+ * the kernel dropped, [7] stutters (video gaps of 50 ms or more), [8] ping in ms
+ */
+JNIEXPORT void JNICALL JNI_FCN(sessionGetReport)(JNIEnv *env, jobject obj, jlong ptr, jfloatArray report_array)
+{
+	AndroidChiakiSession *session = (AndroidChiakiSession *)ptr;
+	AndroidChiakiVideoDecoder *decoder = &session->video_decoder;
+	ChiakiCongestionControl *congestion = &session->session.stream_connection.congestion_control;
+	uint32_t count = __atomic_load_n(&decoder->report_count, __ATOMIC_RELAXED);
+	uint64_t sum = __atomic_load_n(&decoder->report_sum_us, __ATOMIC_RELAXED);
+	jfloat report[9] = {
+		(jfloat)__atomic_load_n(&decoder->frames_rendered, __ATOMIC_RELAXED),
+		count ? (jfloat)(sum / count / 1000.0) : 0.0f,
+		(jfloat)(__atomic_load_n(&decoder->report_max_us, __ATOMIC_RELAXED) / 1000.0),
+		(jfloat)__atomic_load_n(&decoder->frames_skipped_stale, __ATOMIC_RELAXED),
+		(jfloat)__atomic_load_n(&congestion->received_total, __ATOMIC_RELAXED),
+		(jfloat)__atomic_load_n(&congestion->lost_total, __ATOMIC_RELAXED),
+		(jfloat)__atomic_load_n(&session->session.stream_connection.takion.kernel_drops, __ATOMIC_RELAXED),
+		(jfloat)__atomic_load_n(&decoder->report_stutters, __ATOMIC_RELAXED),
+		(jfloat)(session->session.rtt_us / 1000.0)
+	};
+	E->SetFloatArrayRegion(env, report_array, 0, 9, report);
+}
+
 JNIEXPORT void JNICALL JNI_FCN(setLatencyOptions)(JNIEnv *env, jobject obj, jboolean skip_stale_frames, jboolean snapdragon_tuning,
 		jboolean snapdragon_early_output, jboolean low_latency_audio, jboolean big_cores, jint keepalive_ms,
 		jboolean input_redundancy)

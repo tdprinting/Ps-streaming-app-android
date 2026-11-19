@@ -72,7 +72,8 @@ class SetupCheckActivity: AppCompatActivity()
 			batteryCheck(),
 			thermalCheck(),
 			settingsCheck(),
-			rootCheck()
+			rootCheck(),
+			lastStreamCheck()
 		)
 		val layout = binding.checksLayout
 		layout.removeAllViews()
@@ -294,6 +295,15 @@ class SetupCheckActivity: AppCompatActivity()
 				"Settings → Latency → Direct controller input reads the controller without Android's input system (experimental).")
 			else -> Check(Status.INFO, "No root", "Not needed. Only the experimental direct controller input uses it.")
 		}
+	}
+
+	/** The report of the last stream, if there was one */
+	private fun lastStreamCheck(): Check?
+	{
+		val report = Preferences(this).lastStreamReport ?: return null
+		val lines = report.lines()
+		val status = if(lines.lastOrNull()?.startsWith("Tip") == true) Status.WARN else Status.GOOD
+		return Check(status, lines.first(), lines.drop(1).joinToString("\n"))
 	}
 
 	private fun applyBestSettings(p: Preferences)
