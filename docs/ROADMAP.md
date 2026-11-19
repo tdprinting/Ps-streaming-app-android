@@ -48,7 +48,8 @@
 - [ ] Odin preset button: one tap for all latency settings plus the Max quality preset
 - [ ] Optional: the decoder's own frame-ready callback (async MediaCodec) in place of the blocking output thread
 - [ ] Check whether the Odin 2 Portal reports HDR10 to Android (stats overlay), and measure the decode cost of HDR
-- [ ] HDR-capable (10-bit, RGBA1010102) shader path, so debanding and super resolution work with HDR
+- [x] HDR-capable shader path (10-bit BT.2020 PQ surface, half float passes), setting **HDR shaders**
+- [ ] Check on the Odin that HDR shaders stay on (no fallback toast) and the stats show frames as BT.2020 PQ
 - [ ] Verify tearing mode on the Odin 2 Portal (does its display stack support front buffer usage?)
 - [ ] Research: per-game "camera warp" reprojection from the right stick, calibrated by hand (novelty, artifacts expected)
 - [ ] Research: optional 60→120 fps frame *extrapolation* for smoothness only (never interpolation, which adds a frame of delay)

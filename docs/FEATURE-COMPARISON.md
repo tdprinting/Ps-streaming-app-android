@@ -28,7 +28,7 @@ Checked November 2026. Moonlight streams from a PC running Sunshine; PXPlay and 
 
 | Feature | Moonlight | PXPlay | TS5 Streaming |
 |---|---|---|---|
-| HDR | ✓ | ✓ | ✓ HDR10 (H265 HDR) |
+| HDR | ✓ | ✓ | ✓ HDR10 (H265 HDR), also through debanding and super resolution (HDR shaders) |
 | Upscaling / sharpening | – (Artemis: shaders) | FSR, 4K/2K super resolution | ✓ Snapdragon GSR super resolution + sharpness (from Momiji). The Odin's screen is 1080p like the stream, so it isn't needed there |
 | Debanding | – | – | ✓ (from Momiji) |
 | Bitrate control | ✓ | ✓ incl. "bitrate start value" | ✓ up to 100 Mbit/s, Max preset 40 Mbit/s |
@@ -53,4 +53,4 @@ Checked November 2026. Moonlight streams from a PC running Sunshine; PXPlay and 
 | Price | free | license key required | free, open source |
 
 ## Not done yet
-- An HDR-capable shader path, so super resolution and debanding work with HDR
+- Nothing left from Moonlight or PXPlay that a PS5 stream can use

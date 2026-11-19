@@ -20,7 +20,7 @@
 1. On the PS5: Settings → Screen and Video → Video Output → **HDR: On When Supported**. If the PS5's TV doesn't do HDR, or there's no TV, choose **Always On**. Remote Play only sends HDR when the console itself is outputting HDR.
 2. In TS5 Streaming: Settings → Stream → Codec → **H265 HDR**.
 3. Turn on Statistics in a stream. "HDR10: on, display reports HDR10" means the OLED shows it in HDR. If it says Android tone maps it, the Odin's firmware doesn't advertise HDR10 for its panel. One Odin Portal owner found RetroArch didn't see it as HDR either. You'll still get the PS5's 10-bit picture, just mapped down to SDR.
-4. Costs: HDR is 10-bit, so it takes a little more decoding (one Moonlight user measured about 3–4 ms more), and it turns off debanding, super resolution and tearing mode, which draw in 8-bit. For the lowest delay, stay on H265 SDR. For the best picture in slower games, use HDR.
+4. Costs: HDR is 10-bit, so it takes a little more decoding (one Moonlight user measured about 3–4 ms more), and it turns off tearing mode. Debanding and super resolution are off too, unless you turn on **HDR shaders** (experimental), which draws them in 10-bit. With it on, the stats say "through the shaders (frames: BT.2020 PQ)" when it's working. If a toast says the device can't, the stream falls back to the plain HDR path. For the lowest delay, stay on H265 SDR. For the best picture in slower games, use HDR.
 
 ## Odin 2 Portal
 
