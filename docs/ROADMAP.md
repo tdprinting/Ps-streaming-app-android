@@ -37,6 +37,7 @@
 
 ## Done (v0.5)
 - [x] Setup check screen (network, Wi-Fi band and link, display, HDR, audio, power, heat, settings, root) with one-tap best settings
+- [x] Stream report when a stream ends (decode, input delay, ping, loss, stutters, kernel drops, one tip), kept in the setup check
 
 ## Next
 - [ ] **Test on the Odin 2 Portal**: confirm `c2.qti.*.low_latency` starts (see the log / statistics) and that the display stays at 120 Hz
