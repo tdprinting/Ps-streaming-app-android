@@ -23,7 +23,7 @@ class StreamInput(val context: Context, val preferences: Preferences)
 	var lastControllerDeviceId: Int? = null
 		private set
 
-	// Hayai: looked up once instead of on every input event
+	// TS5: looked up once instead of on every input event
 	private val windowManager by lazy { context.getSystemService(Context.WINDOW_SERVICE) as WindowManager }
 
 	val controllerState: ControllerState get()
@@ -52,18 +52,18 @@ class StreamInput(val context: Context, val preferences: Preferences)
 			controllerState.r2State = motionControllerState.r2State
 
 		val merged = controllerState or touchControllerState
-		// Hayai direct input: the built-in gamepad read straight from the kernel
+		// TS5 direct input: the built-in gamepad read straight from the kernel
 		return rawControllerState?.let { merged or it } ?: merged
 	}
 
-	/** Hayai: the latest state from [RootInput], or null when direct input isn't running */
+	/** TS5: the latest state from [RootInput], or null when direct input isn't running */
 	@Volatile private var rawControllerState: ControllerState? = null
-	/** Hayai: the name of the device [RootInput] reads, whose events from Android are ignored */
+	/** TS5: the name of the device [RootInput] reads, whose events from Android are ignored */
 	@Volatile var rawDeviceName: String? = null
 		private set
 	private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
-	/** Hayai: called on the direct input thread with each complete report from the gamepad */
+	/** TS5: called on the direct input thread with each complete report from the gamepad */
 	fun setRawControllerState(state: ControllerState)
 	{
 		rawControllerState = state
@@ -84,7 +84,7 @@ class StreamInput(val context: Context, val preferences: Preferences)
 		}
 	}
 
-	/** Hayai: events from the device direct input reads are already handled, except Back */
+	/** TS5: events from the device direct input reads are already handled, except Back */
 	private fun handledByRawInput(event: InputEvent): Boolean
 	{
 		val name = rawDeviceName ?: return false
@@ -98,7 +98,7 @@ class StreamInput(val context: Context, val preferences: Preferences)
 		return InputDevice.getDevice(event.deviceId)?.name == name
 	}
 
-	// Hayai: how long controller events take from the kernel to this app, through Android
+	// TS5: how long controller events take from the kernel to this app, through Android
 	private var ageSumMs = 0L
 	private var ageCount = 0
 	private var ageMaxMs = 0L
@@ -114,7 +114,7 @@ class StreamInput(val context: Context, val preferences: Preferences)
 			ageMaxMs = age
 	}
 
-	/** Hayai: average and maximum delay of controller events through Android, in ms, since the last call */
+	/** TS5: average and maximum delay of controller events through Android, in ms, since the last call */
 	fun takeInputAge(): Pair<Float, Float>?
 	{
 		if(ageCount == 0)

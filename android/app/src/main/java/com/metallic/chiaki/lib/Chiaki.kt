@@ -494,17 +494,17 @@ data class StreamStats(
 	val frameGapMsMax: Float,
 	/** The audio buffer's lowest level over the last few seconds */
 	val audioBufferMs: Float,
-	/** Hayai: decoded frames skipped because a newer one was ready, since the session started */
+	/** TS5: decoded frames skipped because a newer one was ready, since the session started */
 	val framesSkippedStale: Long = 0,
-	/** Hayai: 0 plain, 1 low latency, 2 Snapdragon low latency decoder */
+	/** TS5: 0 plain, 1 low latency, 2 Snapdragon low latency decoder */
 	val decoderLatencyTier: Int = 0,
-	/** Hayai: the audio device's own buffer, in ms */
+	/** TS5: the audio device's own buffer, in ms */
 	val audioDeviceBufferMs: Float = 0f,
-	/** Hayai: whether the audio stream skips Android's mixer (AAudio exclusive / MMAP) */
+	/** TS5: whether the audio stream skips Android's mixer (AAudio exclusive / MMAP) */
 	val audioExclusive: Boolean = false
 )
 
-/** Hayai: latency options that apply to sessions created from now on */
+/** TS5: latency options that apply to sessions created from now on */
 object LatencyOptions
 {
 	fun apply(skipStaleFrames: Boolean, snapdragonTuning: Boolean, snapdragonEarlyOutput: Boolean,
@@ -641,7 +641,7 @@ class Session(connectInfo: ConnectInfo, logFile: String?, logVerbose: Boolean,
 		withNative { ChiakiNative.sessionLogInfo(it, text) }
 	}
 
-	/** Hayai: packet loss (0 to 1) and the longest frame gap in ms since the last call, for the connection warning */
+	/** TS5: packet loss (0 to 1) and the longest frame gap in ms since the last call, for the connection warning */
 	fun getHealth(): Pair<Float, Float>?
 	{
 		val health = FloatArray(2)

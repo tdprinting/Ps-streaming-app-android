@@ -10,27 +10,27 @@
 ## PS5
 
 - Settings → System → Remote Play → **Enable Remote Play**.
-- Settings → System → Power Saving → Features Available in Rest Mode → **Stay Connected to the Internet** and **Enable Turning On PS5 from Network**, so Hayai can wake it.
+- Settings → System → Power Saving → Features Available in Rest Mode → **Stay Connected to the Internet** and **Enable Turning On PS5 from Network**, so TS5 Streaming can wake it.
 - In games, choose **Performance / 120 fps modes** when offered. The stream is still 60 fps, but a game that renders faster reacts to your input sooner.
 
 ## HDR (optional)
 
 1. On the PS5: Settings → Screen and Video → Video Output → **HDR: On When Supported**. If the PS5's TV doesn't do HDR, or there's no TV, choose **Always On**. Remote Play only sends HDR when the console itself is outputting HDR.
-2. In Hayai: Settings → Stream → Codec → **H265 HDR**.
+2. In TS5 Streaming: Settings → Stream → Codec → **H265 HDR**.
 3. Turn on Statistics in a stream. "HDR10: on, display reports HDR10" means the OLED shows it in HDR. If it says Android tone maps it, the Odin's firmware doesn't advertise HDR10 for its panel. One Odin Portal owner found RetroArch didn't see it as HDR either. You'll still get the PS5's 10-bit picture, just mapped down to SDR.
 4. Costs: HDR is 10-bit, so it takes a little more decoding (one Moonlight user measured about 3–4 ms more), and it turns off debanding, super resolution and tearing mode, which draw in 8-bit. For the lowest delay, stay on H265 SDR. For the best picture in slower games, use HDR.
 
 ## Odin 2 Portal
 
-- Odin settings: performance mode **High Performance** (or Max), fan **Smart** or **Sport**. Hayai keeps clocks at full speed on AYN devices.
-- Android Settings → Display: refresh rate **120 Hz** (Hayai asks for it anyway, but some firmware respects only the system setting).
+- Odin settings: performance mode **High Performance** (or Max), fan **Smart** or **Sport**. TS5 Streaming keeps clocks at full speed on AYN devices.
+- Android Settings → Display: refresh rate **120 Hz** (TS5 Streaming asks for it anyway, but some firmware respects only the system setting).
 - Turn off battery saver while playing.
 - **Audio: use the built-in speakers, the 3.5 mm jack or USB-C audio.** Bluetooth headphones usually add 100–200 ms of audio delay no matter what the app does.
-- Controller mode: Xbox layout. Hayai maps A/B/X/Y to Cross/Circle/Square/Triangle by position. *Swap Cross and Circle* is in Settings if you prefer the Japanese layout.
+- Controller mode: Xbox layout. TS5 Streaming maps A/B/X/Y to Cross/Circle/Square/Triangle by position. *Swap Cross and Circle* is in Settings if you prefer the Japanese layout.
 
-## Hayai
+## TS5 Streaming
 
-1. Install the APK (from the latest GitHub Actions run, artifact *hayai-debug-apk*).
+1. Install the APK (from the latest GitHub Actions run, artifact *ts5-streaming-debug-apk*).
 2. Open it, tap your PS5 and follow the registration steps.
 3. Settings → Stream → Quality: **Max** (default on AYN devices: 1080p60 HEVC, 40 Mbit/s).
 4. Settings → Latency: leave everything on (the default), with display refresh rate *Fastest*.

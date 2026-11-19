@@ -163,7 +163,7 @@
             app:icon="@drawable/ic_super_resolution" />
     </PreferenceCategory>
 
-    <!-- Hayai: everything that trades smoothness or battery for less delay -->
+    <!-- TS5: everything that trades smoothness or battery for less delay -->
     <PreferenceCategory
         app:key="category_latency"
         app:title="@string/preferences_category_title_latency">

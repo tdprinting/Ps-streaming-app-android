@@ -4,20 +4,28 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/home_gradient_bottom">
+
+    <!-- TS5: animated particles behind everything -->
+    <com.metallic.chiaki.main.ParticleFlowView
+        android:id="@+id/particleView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no" />
 
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:liftOnScroll="true"
-        app:liftOnScrollTargetViewId="@id/hostsRecyclerView">
+        android:background="@android:color/transparent"
+        app:elevation="0dp">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:layout_scrollFlags="scroll|enterAlways|snap">
+            android:background="@android:color/transparent">
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -36,23 +44,73 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="10dp"
                     android:text="@string/app_name"
-                    android:textAppearance="?attr/textAppearanceTitleLarge"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textStyle="bold" />
+                    android:fontFamily="sans-serif-light"
+                    android:letterSpacing="0.04"
+                    android:textSize="20sp"
+                    android:textColor="?attr/colorOnSurface" />
             </LinearLayout>
+
+            <!-- TS5: the time, top right, like a console home screen -->
+            <TextClock
+                android:id="@+id/homeClock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="8dp"
+                android:fontFamily="sans-serif-light"
+                android:format12Hour="h:mm a"
+                android:format24Hour="HH:mm"
+                android:textSize="18sp"
+                android:textColor="?attr/colorOnSurface" />
         </com.google.android.material.appbar.MaterialToolbar>
     </com.google.android.material.appbar.AppBarLayout>
 
+    <!-- TS5: the selected console's name and state, large, above the row of tiles -->
+    <LinearLayout
+        android:id="@+id/heroLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginTop="@dimen/home_hero_top"
+        android:paddingStart="@dimen/home_side_padding"
+        android:paddingEnd="@dimen/home_side_padding"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/heroTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-light"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="@dimen/home_hero_title"
+            android:textColor="?attr/colorOnSurface" />
+
+        <TextView
+            android:id="@+id/heroSubtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="16sp"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+    </LinearLayout>
+
+    <!-- TS5: one horizontal row of big console tiles, like a console home screen -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/hostsRecyclerView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:paddingStart="10dp"
-        android:paddingEnd="10dp"
-        android:paddingTop="4dp"
-        android:paddingBottom="96dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginBottom="@dimen/home_row_bottom"
+        android:paddingStart="@dimen/home_side_padding"
+        android:paddingEnd="@dimen/home_side_padding"
+        android:paddingTop="24dp"
+        android:paddingBottom="24dp"
         android:clipToPadding="false"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+        android:clipChildren="false"
+        android:layoutAnimation="@anim/home_row_layout" />
 
     <LinearLayout
         android:id="@+id/emptyInfoLayout"
@@ -127,6 +185,10 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
+        app:backgroundTint="#26FFFFFF"
+        android:textColor="?attr/colorOnSurface"
+        app:iconTint="?attr/colorOnSurface"
+        app:elevation="0dp"
         android:text="@string/action_add_console"
         app:icon="@drawable/ic_add" />
 

@@ -186,7 +186,7 @@ typedef struct android_chiaki_session_t
 
 	// Packet counts at the last sessionGetStats(), for the loss since then
 	uint64_t stats_received, stats_lost;
-	// Hayai: the same for sessionGetHealth(), kept apart so the overlay and the warning don't
+	// TS5: the same for sessionGetHealth(), kept apart so the overlay and the warning don't
 	// reset each other's counts
 	uint64_t health_received, health_lost;
 } AndroidChiakiSession;
@@ -780,7 +780,7 @@ JNIEXPORT void JNICALL JNI_FCN(sessionGetStats)(JNIEnv *env, jobject obj, jlong 
 		(jfloat)(__atomic_load_n(&decoder->stats_latency_max_us, __ATOMIC_RELAXED) / 1000.0),
 		(jfloat)(__atomic_exchange_n(&decoder->gap_max_stats_us, 0, __ATOMIC_RELAXED) / 1000.0),
 		(jfloat)android_chiaki_audio_output_buffered_ms(session->audio_output),
-		// Hayai
+		// TS5
 		(jfloat)__atomic_load_n(&decoder->frames_skipped_stale, __ATOMIC_RELAXED),
 		(jfloat)decoder->latency_tier,
 		(jfloat)(android_chiaki_audio_output_device_buffer_us(session->audio_output) / 1000.0),
@@ -789,9 +789,9 @@ JNIEXPORT void JNICALL JNI_FCN(sessionGetStats)(JNIEnv *env, jobject obj, jlong 
 	E->SetFloatArrayRegion(env, stats_array, 0, 12, stats);
 }
 
-/** Hayai latency options for decoders created from now on, see video-decoder.h */
+/** TS5 latency options for decoders created from now on, see video-decoder.h */
 /**
- * Hayai, for the poor connection warning (as Moonlight shows): packet loss since the last call
+ * TS5, for the poor connection warning (as Moonlight shows): packet loss since the last call
  * (0 to 1) in [0] and the longest gap between video frames since the last call, in ms, in [1]
  */
 JNIEXPORT void JNICALL JNI_FCN(sessionGetHealth)(JNIEnv *env, jobject obj, jlong ptr, jfloatArray health_array)

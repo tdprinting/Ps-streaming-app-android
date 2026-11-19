@@ -23,7 +23,7 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
 /**
- * Hayai "tearing mode": shows each decoded frame by drawing it straight into a front buffer, the
+ * TS5 "tearing mode": shows each decoded frame by drawing it straight into a front buffer, the
  * buffer the display is reading from at that moment.
  *
  * The normal path queues a frame to SurfaceFlinger, which latches it at the next vsync and has the
@@ -104,7 +104,7 @@ class FrontBufferVideo(
 	private val surface = Surface(surfaceTexture)
 
 	// The decoder's frame-ready callbacks, on a thread of their own so a busy UI thread can't delay them
-	private val frameThread = HandlerThread("Hayai front buffer", Process.THREAD_PRIORITY_URGENT_DISPLAY).also { it.start() }
+	private val frameThread = HandlerThread("TS5 front buffer", Process.THREAD_PRIORITY_URGENT_DISPLAY).also { it.start() }
 
 	private var texture = 0
 	private var program = 0

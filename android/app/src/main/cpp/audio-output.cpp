@@ -26,16 +26,16 @@
 #define CATCH_UP_WINDOW_MS 4000
 #define CATCH_UP_KEEP_MS 20
 #define CATCH_UP_SLACK_MS 20
-// Hayai low latency audio: a shorter window and less kept back, so sound that piles up behind
+// TS5 low latency audio: a shorter window and less kept back, so sound that piles up behind
 // (Wi-Fi bursts) is trimmed faster and the steady state sits closer to the picture
 #define LL_CATCH_UP_WINDOW_MS 2000
 #define LL_CATCH_UP_KEEP_MS 10
 #define LL_CATCH_UP_SLACK_MS 10
-// Hayai low latency audio: the device buffer starts at two bursts ("double buffering", Android's
+// TS5 low latency audio: the device buffer starts at two bursts ("double buffering", Android's
 // recommendation) and grows by a burst after each underrun, up to this many
 #define LL_MAX_BURSTS 6
 
-// Hayai: see android_chiaki_audio_output_set_low_latency()
+// TS5: see android_chiaki_audio_output_set_low_latency()
 static std::atomic<bool> low_latency_audio{true};
 
 extern "C" void android_chiaki_audio_output_set_low_latency(bool enabled)
@@ -86,13 +86,13 @@ struct AudioOutput
 	// Skipped by the callback, logged from the decoder's thread, as the callback shouldn't write files
 	std::atomic<int32_t> skipped_ms{0};
 	std::atomic<int32_t> skipped_from_ms{0};
-	// Hayai: whether this stream runs the low latency setup, decided when it is opened
+	// TS5: whether this stream runs the low latency setup, decided when it is opened
 	bool low_latency = false;
-	// Hayai: underruns seen so far, and frames played since they were last checked.
+	// TS5: underruns seen so far, and frames played since they were last checked.
 	// Only the stream's callback uses these.
 	int32_t xruns_seen = 0;
 	int64_t frames_since_xrun_check = 0;
-	// Hayai: for the statistics, written when the stream opens or the buffer grows
+	// TS5: for the statistics, written when the stream opens or the buffer grows
 	std::atomic<int32_t> device_buffer_frames{0};
 	std::atomic<int32_t> device_rate{0};
 	std::atomic<bool> exclusive{false};
@@ -111,7 +111,7 @@ static void open_stream(AudioOutput *ao)
 
 	oboe::AudioStreamBuilder builder;
 	// Shared: exclusive streams are refused or dropped by some HDMI outputs, e.g. on TV boxes.
-	// Hayai: exclusive in low latency mode, so the sound skips Android's mixer and goes straight
+	// TS5: exclusive in low latency mode, so the sound skips Android's mixer and goes straight
 	// into the buffer the DSP reads (AAudio MMAP), which saves several ms on the built-in speakers
 	// and wired headphones. Android opens a shared stream instead when it can't give exclusive.
 	ao->low_latency = low_latency_audio.load(std::memory_order_relaxed) && !ao->use_opensl;
@@ -237,7 +237,7 @@ extern "C" bool android_chiaki_audio_output_exclusive(void *audio_output)
 }
 
 /**
- * Hayai: grows the device buffer by a burst after an underrun, like Oboe's LatencyTuner, so it
+ * TS5: grows the device buffer by a burst after an underrun, like Oboe's LatencyTuner, so it
  * stays as small as this device allows without crackling. Runs in the stream's callback.
  */
 static void tune_buffer(AudioOutput *ao, oboe::AudioStream *stream, int32_t num_frames)

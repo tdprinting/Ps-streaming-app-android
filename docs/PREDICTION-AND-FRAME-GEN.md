@@ -1,6 +1,6 @@
 # Input prediction, reprojection and frame generation: what can and can't help a PS5 stream
 
-Researched November 2026. The question: can a Remote Play client predict input, warp frames or generate frames to cut the delay you feel? Short answer: **the techniques that work in local games need the game's cooperation, which a PS5 stream doesn't give us.** Here is each idea, what it needs, and where Hayai stands.
+Researched November 2026. The question: can a Remote Play client predict input, warp frames or generate frames to cut the delay you feel? Short answer: **the techniques that work in local games need the game's cooperation, which a PS5 stream doesn't give us.** Here is each idea, what it needs, and where TS5 Streaming stands.
 
 ## 1. Input prediction ("negative latency")
 
@@ -8,7 +8,7 @@ Researched November 2026. The question: can a Remote Play client predict input, 
 
 **Why it doesn't fit Remote Play.** Prediction needs to run the game's logic (or a model of it) on the client. Research on cloud gaming points out that client-side prediction doesn't apply when the client only decodes and shows the stream from the server. Published latency compensation work changes the game itself (for example, assisting the player's aim), and Remote Play gives us no hook into PS5 games.
 
-**What Hayai does instead.** It cuts the time to get each real input to the console: unbuffered input, the feedback sender firing on every change, DSCP-marked packets, and threads on the fast cores.
+**What TS5 Streaming does instead.** It cuts the time to get each real input to the console: unbuffered input, the feedback sender firing on every change, DSCP-marked packets, and threads on the fast cores.
 
 ## 2. Reprojection / "Frame Warp" (NVIDIA Reflex 2 style)
 
@@ -31,9 +31,9 @@ Researched November 2026. The question: can a Remote Play client predict input, 
 
 The Snapdragon 8 Gen 2's Adreno 740 does have Qualcomm's Frame Motion Engine. But a stream has no depth or motion vectors, and MediaCodec doesn't expose the encoder's motion vectors, so extrapolation would need optical flow computed from the video itself.
 
-**Verdict.** Interpolation would make Hayai feel *worse*. Extrapolation to 120 fps is a possible future option for smoothness only, off by default and clearly labelled as such. It wouldn't reduce input delay.
+**Verdict.** Interpolation would make TS5 Streaming feel *worse*. Extrapolation to 120 fps is a possible future option for smoothness only, off by default and clearly labelled as such. It wouldn't reduce input delay.
 
-## What *does* reduce delay, and is in Hayai
+## What *does* reduce delay, and is in TS5 Streaming
 
 | Technique | Where it saves | Status |
 |---|---|---|

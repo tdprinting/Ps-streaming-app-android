@@ -38,7 +38,7 @@ class Preferences(context: Context)
 	{
 		CODEC_H264("h264", R.string.preferences_codec_title_h264, com.metallic.chiaki.lib.Codec.CODEC_H264),
 		CODEC_H265("h265", R.string.preferences_codec_title_h265, com.metallic.chiaki.lib.Codec.CODEC_H265),
-		/** Hayai: 10-bit HEVC with HDR10 (BT.2020, PQ), PS5 only */
+		/** TS5: 10-bit HEVC with HDR10 (BT.2020, PQ), PS5 only */
 		CODEC_H265_HDR("h265_hdr", R.string.preferences_codec_title_h265_hdr, com.metallic.chiaki.lib.Codec.CODEC_H265_HDR)
 	}
 
@@ -50,7 +50,7 @@ class Preferences(context: Context)
 		SMOOTH("smooth", R.string.quality_smooth, R.string.quality_smooth_summary),
 		BALANCED("balanced", R.string.quality_balanced, R.string.quality_balanced_summary),
 		SHARP("sharp", R.string.quality_sharp, R.string.quality_sharp_summary),
-		/** Hayai: the most a PS5 encodes, for a strong local network such as Wi-Fi 6E */
+		/** TS5: the most a PS5 encodes, for a strong local network such as Wi-Fi 6E */
 		MAX("max", R.string.quality_max, R.string.quality_max_summary),
 		CUSTOM("custom", R.string.quality_custom, R.string.quality_custom_summary);
 
@@ -68,7 +68,7 @@ class Preferences(context: Context)
 		/** A PS4 Pro can't stream much more */
 		private const val SHARP_BITRATE_PS4 = 15000
 		private const val SHARP_BITRATE_PS5 = 25000
-		/** Hayai: 1080p60 at 40 Mbit/s, comfortably inside a 6 GHz Wi-Fi link 20 feet from the router */
+		/** TS5: 1080p60 at 40 Mbit/s, comfortably inside a 6 GHz Wi-Fi link 20 feet from the router */
 		private const val MAX_BITRATE_PS5 = 40000
 		val qualityAwayDefault = Quality.SMOOTH
 		val fpsDefault = FPS.FPS_60
@@ -96,7 +96,7 @@ class Preferences(context: Context)
 			|| packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
 
 	/**
-	 * Hayai: AYN's Android handhelds (Odin 2, Odin 2 Portal, Odin 2 Mini, Thor), which have a
+	 * TS5: AYN's Android handhelds (Odin 2, Odin 2 Portal, Odin 2 Mini, Thor), which have a
 	 * fan, a 1080p screen and, on the Portal, a 120 Hz OLED. Only used to pick defaults.
 	 */
 	val isAynHandheld = android.os.Build.MANUFACTURER.equals("AYN", ignoreCase = true)
@@ -105,7 +105,7 @@ class Preferences(context: Context)
 	private val resolutionDefault = if(isTv || isAynHandheld) Resolution.RES_1080P else Resolution.RES_720P
 
 
-	/** Hayai: how the display's refresh rate is chosen while streaming */
+	/** TS5: how the display's refresh rate is chosen while streaming */
 	enum class RefreshMode(val value: String)
 	{
 		/** The highest rate the display has, e.g. 120 Hz: a new frame waits at most one short refresh */
@@ -122,7 +122,7 @@ class Preferences(context: Context)
 	}
 
 	/**
-	 * Hayai: Moonlight-style frame pacing presets over [refreshMode] and [skipStaleFrames].
+	 * TS5: Moonlight-style frame pacing presets over [refreshMode] and [skipStaleFrames].
 	 * Lowest latency: fastest refresh, late frames skipped. Balanced: 60 Hz, late frames skipped.
 	 * Smoothest: 60 Hz, every frame shown once in order, even late ones.
 	 */
@@ -157,62 +157,62 @@ class Preferences(context: Context)
 		get() = RefreshMode.fromValue(sharedPreferences.getString(refreshModeKey, null)) ?: RefreshMode.MAX
 		set(value) { sharedPreferences.edit().putString(refreshModeKey, value.value).apply() }
 
-	/** Hayai: View.requestUnbufferedDispatch, so stick and trigger moves don't wait for the next vsync */
+	/** TS5: View.requestUnbufferedDispatch, so stick and trigger moves don't wait for the next vsync */
 	val unbufferedInputKey get() = "latency_unbuffered_input"
 	var unbufferedInput
 		get() = sharedPreferences.getBoolean(unbufferedInputKey, true)
 		set(value) { sharedPreferences.edit().putBoolean(unbufferedInputKey, value).apply() }
 
-	/** Hayai: show only the newest decoded frame after a burst from the network */
+	/** TS5: show only the newest decoded frame after a burst from the network */
 	val skipStaleFramesKey get() = "latency_skip_stale_frames"
 	var skipStaleFrames
 		get() = sharedPreferences.getBoolean(skipStaleFramesKey, true)
 		set(value) { sharedPreferences.edit().putBoolean(skipStaleFramesKey, value).apply() }
 
-	/** Hayai: Qualcomm's dedicated low latency decoder and top video clock */
+	/** TS5: Qualcomm's dedicated low latency decoder and top video clock */
 	val snapdragonTuningKey get() = "latency_snapdragon_tuning"
 	var snapdragonTuning
 		get() = sharedPreferences.getBoolean(snapdragonTuningKey, true)
 		set(value) { sharedPreferences.edit().putBoolean(snapdragonTuningKey, value).apply() }
 
-	/** Hayai: Snapdragon decoder hands frames on with a software fence (vendor.qti-ext-output-sw-fence-enable) */
+	/** TS5: Snapdragon decoder hands frames on with a software fence (vendor.qti-ext-output-sw-fence-enable) */
 	val snapdragonEarlyOutputKey get() = "latency_snapdragon_early_output"
 	var snapdragonEarlyOutput
 		get() = sharedPreferences.getBoolean(snapdragonEarlyOutputKey, true)
 		set(value) { sharedPreferences.edit().putBoolean(snapdragonEarlyOutputKey, value).apply() }
 
-	/** Hayai: exclusive (MMAP) audio with the smallest device buffer that doesn't crackle. Off on TVs, whose HDMI outputs drop exclusive streams. */
+	/** TS5: exclusive (MMAP) audio with the smallest device buffer that doesn't crackle. Off on TVs, whose HDMI outputs drop exclusive streams. */
 	val lowLatencyAudioKey get() = "latency_low_latency_audio"
 	var lowLatencyAudio
 		get() = sharedPreferences.getBoolean(lowLatencyAudioKey, !isTv)
 		set(value) { sharedPreferences.edit().putBoolean(lowLatencyAudioKey, value).apply() }
 
-	/** Hayai: keep the network, decoder and audio threads off the little CPU cores */
+	/** TS5: keep the network, decoder and audio threads off the little CPU cores */
 	val bigCoresKey get() = "latency_big_cores"
 	var bigCores
 		get() = sharedPreferences.getBoolean(bigCoresKey, true)
 		set(value) { sharedPreferences.edit().putBoolean(bigCoresKey, value).apply() }
 
-	/** Hayai: repeat the controller state every 20 ms so Wi-Fi never dozes between inputs */
+	/** TS5: repeat the controller state every 20 ms so Wi-Fi never dozes between inputs */
 	val keepWifiAwakeKey get() = "latency_keep_wifi_awake"
 	var keepWifiAwake
 		get() = sharedPreferences.getBoolean(keepWifiAwakeKey, true)
 		set(value) { sharedPreferences.edit().putBoolean(keepWifiAwakeKey, value).apply() }
 
-	/** Hayai: Moonlight-style warning when packets are lost or frames arrive late */
+	/** TS5: Moonlight-style warning when packets are lost or frames arrive late */
 	val connectionWarningsKey get() = "stream_connection_warnings"
 	var connectionWarnings
 		get() = sharedPreferences.getBoolean(connectionWarningsKey, true)
 		set(value) { sharedPreferences.edit().putBoolean(connectionWarningsKey, value).apply() }
 
-	/** Hayai, experimental, root: read the built-in gamepad from /dev/input directly, see RootInput */
+	/** TS5, experimental, root: read the built-in gamepad from /dev/input directly, see RootInput */
 	val directInputKey get() = "latency_direct_input"
 	var directInput
 		get() = sharedPreferences.getBoolean(directInputKey, false)
 		set(value) { sharedPreferences.edit().putBoolean(directInputKey, value).apply() }
 
 	/**
-	 * Hayai, experimental: draw each frame straight into the buffer the display is scanning out
+	 * TS5, experimental: draw each frame straight into the buffer the display is scanning out
 	 * (front buffer rendering), skipping the wait for the next refresh and the compositor. Tears.
 	 */
 	val frontBufferKey get() = "latency_front_buffer"
@@ -221,7 +221,7 @@ class Preferences(context: Context)
 		set(value) { sharedPreferences.edit().putBoolean(frontBufferKey, value).apply() }
 
 	/**
-	 * Hayai: Android's sustained performance mode holds clocks below their peak so a fanless phone
+	 * TS5: Android's sustained performance mode holds clocks below their peak so a fanless phone
 	 * doesn't throttle. The Odin's fan keeps it cool, so there it is off by default for full clocks.
 	 */
 	val sustainedPerformanceKey get() = "latency_sustained_performance"

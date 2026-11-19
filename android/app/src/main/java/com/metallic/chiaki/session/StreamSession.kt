@@ -56,7 +56,7 @@ class StreamSession(val connectInfo: ConnectInfo, val logManager: LogManager, va
 		private set
 
 	fun stats() = session?.getStats()
-	/** Hayai: packet loss and longest frame gap since the last call, see Session.getHealth */
+	/** TS5: packet loss and longest frame gap since the last call, see Session.getHealth */
 	fun health() = session?.getHealth()
 	fun logInfo(text: String) = session?.logInfo(text)
 

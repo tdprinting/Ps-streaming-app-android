@@ -22,13 +22,13 @@ void android_chiaki_audio_output_frame(int16_t *buf, size_t samples_count, void 
 /** How much audio the buffer held at its lowest over the last few seconds, in ms */
 int32_t android_chiaki_audio_output_buffered_ms(void *audio_output);
 /**
- * Hayai: exclusive (MMAP) stream with a two-burst device buffer that grows only after underruns,
+ * TS5: exclusive (MMAP) stream with a two-burst device buffer that grows only after underruns,
  * and a tighter catch-up on the app's own buffer. For streams opened from now on.
  */
 void android_chiaki_audio_output_set_low_latency(bool enabled);
-/** Hayai: the device buffer's size in microseconds, for the statistics */
+/** TS5: the device buffer's size in microseconds, for the statistics */
 int32_t android_chiaki_audio_output_device_buffer_us(void *audio_output);
-/** Hayai: whether the stream got exclusive access to the output */
+/** TS5: whether the stream got exclusive access to the output */
 bool android_chiaki_audio_output_exclusive(void *audio_output);
 
 #ifdef __cplusplus

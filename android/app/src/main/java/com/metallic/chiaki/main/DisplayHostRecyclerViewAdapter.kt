@@ -51,6 +51,12 @@ class DisplayHostRecyclerViewAdapter(
 			diff.dispatchUpdatesTo(this)
 		}
 
+	/**
+	 * TS5: called with the console whose tile got focus (with a controller) or was touched, so the
+	 * home screen can show its name large above the row
+	 */
+	var focusCallback: ((DisplayHost) -> Unit)? = null
+
 	class ViewHolder(val binding: ItemDisplayHostBinding): RecyclerView.ViewHolder(binding.root)
 
 	override fun onCreateViewHolder(parent: ViewGroup, viewType: Int)
@@ -107,6 +113,14 @@ class DisplayHostRecyclerViewAdapter(
 			it.primaryActionButton.setText(actionText)
 			it.primaryActionButton.setIconResource(actionIcon)
 			it.root.setOnClickListener { clickCallback(host) }
+			// TS5: the focused tile grows and lifts with a little overshoot, like a console home screen
+			it.root.setOnFocusChangeListener { view, hasFocus ->
+				animateTileFocus(view, hasFocus)
+				if(hasFocus)
+					focusCallback?.invoke(host)
+			}
+			if(!it.root.isFocused)
+				resetTile(it.root)
 
 			// PSN wakes a console up by itself, and its registration has its own card at home
 			val registered = host.isRegistered && host !is PsnDisplayHost
@@ -158,6 +172,37 @@ class DisplayHostRecyclerViewAdapter(
 				it.root.setOnLongClickListener(null)
 				it.root.nextFocusRightId = View.NO_ID
 			}
+		}
+	}
+
+	companion object
+	{
+		private const val FOCUSED_SCALE = 1.1f
+		private val focusInterpolator = android.view.animation.OvershootInterpolator(1.6f)
+		private val unfocusInterpolator = android.view.animation.DecelerateInterpolator()
+
+		/** TS5: grows the focused tile and lifts it off the background */
+		fun animateTileFocus(view: View, focused: Boolean)
+		{
+			val lift = 18f * view.resources.displayMetrics.density
+			view.animate()
+				.scaleX(if(focused) FOCUSED_SCALE else 1f)
+				.scaleY(if(focused) FOCUSED_SCALE else 1f)
+				.translationZ(if(focused) lift else 0f)
+				.alpha(if(focused) 1f else 0.82f)
+				.setDuration(if(focused) 260 else 180)
+				.setInterpolator(if(focused) focusInterpolator else unfocusInterpolator)
+				.start()
+		}
+
+		/** A recycled tile starts out unfocused */
+		fun resetTile(view: View)
+		{
+			view.animate().cancel()
+			view.scaleX = 1f
+			view.scaleY = 1f
+			view.translationZ = 0f
+			view.alpha = 0.82f
 		}
 	}
 }

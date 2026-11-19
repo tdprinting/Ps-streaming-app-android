@@ -21,7 +21,7 @@
 
 static void *android_chiaki_video_decoder_output_thread_func(void *user);
 
-// Hayai latency options, see video-decoder.h. Written from the UI thread before
+// TS5 latency options, see video-decoder.h. Written from the UI thread before
 // a session starts, read when a decoder is created.
 static volatile bool latency_skip_stale_frames = true;
 static volatile bool latency_snapdragon_tuning = true;
@@ -122,7 +122,7 @@ static AMediaFormat *create_format(AndroidChiakiVideoDecoder *decoder,
   AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_HEIGHT,
                         decoder->target_height);
   if (chiaki_codec_is_hdr(decoder->target_codec)) {
-    // Hayai HDR: the PS5 sends 10-bit HEVC in HDR10 (BT.2020 primaries, PQ
+    // TS5 HDR: the PS5 sends 10-bit HEVC in HDR10 (BT.2020 primaries, PQ
     // transfer, limited range). The stream's own VUI says the same; these are
     // hints so the decoder tags its 10-bit output as HDR from the
     // first frame, which lets SurfaceFlinger show it on the OLED in HDR (or

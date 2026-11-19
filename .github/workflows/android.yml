@@ -41,6 +41,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: hayai-debug-apk
+          name: ts5-streaming-debug-apk
           path: android/app/build/outputs/apk/fdroid/debug/*.apk
           if-no-files-found: error

@@ -68,8 +68,8 @@
     </style>
 
     <style name="ConsoleCard" parent="Widget.Material3.CardView.Filled">
-        <item name="cardBackgroundColor">?attr/colorSurfaceContainerHigh</item>
-        <item name="cardCornerRadius">24dp</item>
+        <item name="cardBackgroundColor">@color/home_tile</item>
+        <item name="cardCornerRadius">18dp</item>
         <item name="strokeColor">@color/console_card_stroke</item>
         <item name="strokeWidth">3dp</item>
     </style>

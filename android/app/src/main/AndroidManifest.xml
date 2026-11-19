@@ -35,7 +35,7 @@
         android:appCategory="game"
         tools:ignore="GoogleAppIndexingWarning">
 
-        <!-- Hayai: Android 13+ Game Mode. Performance mode is allowed, and the system may not cap
+        <!-- TS5: Android 13+ Game Mode. Performance mode is allowed, and the system may not cap
              the frame rate or render at a lower resolution, which would add delay or blur. -->
         <meta-data
             android:name="android.game_mode_config"

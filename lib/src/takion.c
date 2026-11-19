@@ -180,7 +180,7 @@ static ChiakiErrorCode takion_read_extra_sock_messages(ChiakiTakion *takion);
 #if defined(__ANDROID__)
 #include <netinet/in.h>
 /**
- * Hayai: marks the stream's packets DSCP EF (expedited forwarding, 46), the class for real-time
+ * TS5: marks the stream's packets DSCP EF (expedited forwarding, 46), the class for real-time
  * traffic. Linux's Wi-Fi stack maps it to a WMM priority above best effort, so the controller
  * input this device sends wins airtime over other traffic on a busy channel, and routers that
  * honor DSCP queue it first. Failure is harmless: the packets simply go unmarked.

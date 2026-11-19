@@ -62,7 +62,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 {
 	companion object
 	{
-		/** Hayai: how often the connection warning checks the stream */
+		/** TS5: how often the connection warning checks the stream */
 		private const val CONNECTION_CHECK_MS = 1000L
 		private const val TAG = "StreamActivity"
 		private const val HINT_SHORT_MS = 2500L
@@ -96,7 +96,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			return
 		}
 
-		// Hayai: read by the native video decoder when it is created for this stream
+		// TS5: read by the native video decoder when it is created for this stream
 		Preferences(this).let {
 			LatencyOptions.apply(it.skipStaleFrames, it.snapdragonTuning, it.snapdragonEarlyOutput,
 				it.lowLatencyAudio, it.bigCores, if(it.keepWifiAwake) 20 else 0)
@@ -125,11 +125,11 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
 			window.setPreferMinimalPostProcessing(true)
 		// Steady clocks instead of full speed until the phone gets hot and throttles hard.
-		// Hayai: optional, off on AYN handhelds, whose fan lets the clocks stay at full speed.
+		// TS5: optional, off on AYN handhelds, whose fan lets the clocks stay at full speed.
 		if(Preferences(this).sustainedPerformance
 			&& (getSystemService(POWER_SERVICE) as PowerManager).isSustainedPerformanceModeSupported)
 			window.setSustainedPerformanceMode(true)
-		// Hayai: ask for the display's fastest mode (120 Hz on the Odin 2 Portal) before the first frame
+		// TS5: ask for the display's fastest mode (120 Hz on the Odin 2 Portal) before the first frame
 		requestRefreshModeForWindow()
 
 		binding = ActivityStreamBinding.inflate(layoutInflater)
@@ -258,11 +258,11 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 	/** Draws the video through shaders, when debanding or super resolution is on */
 	private var videoRenderer: VideoRenderer? = null
 
-	/** Hayai: tearing mode, see [FrontBufferVideo] */
+	/** TS5: tearing mode, see [FrontBufferVideo] */
 	private var frontBufferVideo: FrontBufferVideo? = null
 
 	/**
-	 * Hayai: the display's modes at the current resolution with the highest refresh rate, e.g. the
+	 * TS5: the display's modes at the current resolution with the highest refresh rate, e.g. the
 	 * Odin 2 Portal's 120 Hz mode. Null when there is no faster mode than the current one to pick.
 	 */
 	private fun fastestDisplayMode(): Display.Mode?
@@ -287,7 +287,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 	}
 
 	/**
-	 * Hayai: in [Preferences.RefreshMode.MAX], pins the window to the display's fastest mode.
+	 * TS5: in [Preferences.RefreshMode.MAX], pins the window to the display's fastest mode.
 	 *
 	 * The PS5 sends 60 fps, but on a 120 Hz screen a decoded frame waits at most 8.3 ms for the next
 	 * refresh instead of 16.7 ms, about 4 ms less on average, and the panel scans it out in half the
@@ -302,7 +302,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 	}
 
 	/**
-	 * Hayai: tells the system which rate the video surface wants, by the refresh mode setting.
+	 * TS5: tells the system which rate the video surface wants, by the refresh mode setting.
 	 * MAX asks for the fastest rate without claiming a fixed frame rate, so it isn't lowered to 60 Hz
 	 * for a 60 fps stream; MATCH is Momiji's original behavior.
 	 */
@@ -323,7 +323,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 	}
 
 	/**
-	 * Hayai: Android hands stick and trigger moves (MotionEvents) to apps once per vsync, batched.
+	 * TS5: Android hands stick and trigger moves (MotionEvents) to apps once per vsync, batched.
 	 * Unbuffered dispatch delivers each one as it arrives, so it goes out to the console right away
 	 * instead of up to a refresh later. Buttons (KeyEvents) are never batched.
 	 */
@@ -356,7 +356,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 	private fun setupVideoOutput() {
 		val prefs = Preferences(this)
 		viewModel.session.detachSurface()
-		// Hayai HDR: 10-bit video must reach SurfaceFlinger untouched. The shader paths draw in 8-bit
+		// TS5 HDR: 10-bit video must reach SurfaceFlinger untouched. The shader paths draw in 8-bit
 		// RGBA, which would clip and mistone it, so an HDR stream always takes the plain SurfaceView.
 		val hdr = isHdrStream()
 		if (hdr && (prefs.debandingEnabled || prefs.upscalingEnabled || prefs.frontBuffer))
@@ -368,7 +368,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && prefs.frontBuffer && !hdr
 			&& !deband && !upscale && FrontBufferVideo.isSupported()) {
-			// Hayai tearing mode: the decoder writes into a texture that is drawn straight into the
+			// TS5 tearing mode: the decoder writes into a texture that is drawn straight into the
 			// front buffer the display is scanning out, layered on the plain SurfaceView
 			binding.surfaceView.visibility = View.VISIBLE
 			binding.debandSurfaceView.visibility = View.GONE
@@ -515,7 +515,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		updateSecondScreen()
 	}
 
-	/** Hayai direct input, see [RootInput] */
+	/** TS5 direct input, see [RootInput] */
 	private var rootInput: RootInput? = null
 	private var rootInputStarting: Thread? = null
 
@@ -740,7 +740,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 
 	private val statsHandler = Handler(Looper.getMainLooper())
 
-	// Hayai: Moonlight-style poor connection warning. Shown after two bad seconds in a row (over 5%
+	// TS5: Moonlight-style poor connection warning. Shown after two bad seconds in a row (over 5%
 	// packet loss, or frames 100 ms or more apart), hidden after three good ones.
 	private var badConnectionSeconds = 0
 	private var goodConnectionSeconds = 0
@@ -848,14 +848,14 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		).joinToString("\n")
 	}
 
-	/** Hayai: whether this stream is HDR10, which only a PS5 sends */
+	/** TS5: whether this stream is HDR10, which only a PS5 sends */
 	private fun isHdrStream(): Boolean
 	{
 		val connectInfo = viewModel.session.connectInfo
 		return connectInfo.ps5 && connectInfo.videoProfile.codec == com.metallic.chiaki.lib.Codec.CODEC_H265_HDR
 	}
 
-	/** Hayai: whether the display says it can show HDR10, for the statistics */
+	/** TS5: whether the display says it can show HDR10, for the statistics */
 	private fun displayReportsHdr10(): Boolean
 	{
 		@Suppress("DEPRECATION")
@@ -864,7 +864,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		return display.hdrCapabilities?.supportedHdrTypes?.contains(Display.HdrCapabilities.HDR_TYPE_HDR10) == true
 	}
 
-	/** Hayai: the decoder mode for the statistics */
+	/** TS5: the decoder mode for the statistics */
 	private fun decoderTierText(tier: Int) = getString(when(tier)
 	{
 		2 -> R.string.stream_stats_decoder_snapdragon

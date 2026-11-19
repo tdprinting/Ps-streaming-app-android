@@ -107,8 +107,11 @@ class MainActivity : AppCompatActivity()
 			this::addToHomeScreen.takeIf { ConsoleShortcuts.canPin(this) }, this::chooseQuality, this::renameConsole)
 		val supportAdapter = SupportFooterAdapter(this::openSupportPage)
 		supportPromptAdapter = SupportPromptAdapter({ answerSupportPrompt(); openSupportPage() }, this::answerSupportPrompt)
-		binding.hostsRecyclerView.adapter = ConcatAdapter(supportPromptAdapter, hostsAdapter, supportAdapter)
-		layoutManager = GridLayoutManager(this, 1)
+		// TS5: a single row of console tiles. The support footer and prompt (for Momiji's developer)
+		// stay off the home row to keep it simple; Settings → About links to them.
+		binding.hostsRecyclerView.adapter = hostsAdapter
+		hostsAdapter.focusCallback = { showHero(it) }
+		layoutManager = GridLayoutManager(this, 1, GridLayoutManager.HORIZONTAL, false)
 		layoutManager.spanSizeLookup = object: GridLayoutManager.SpanSizeLookup()
 		{
 			// The consoles share the columns, the thank-you and the footer take a whole row
@@ -128,7 +131,7 @@ class MainActivity : AppCompatActivity()
 			}
 		})
 		viewModel.displayHosts.observe(this, Observer {
-			val top = binding.hostsRecyclerView.computeVerticalScrollOffset() == 0
+			val top = binding.hostsRecyclerView.computeHorizontalScrollOffset() == 0
 			hostsAdapter.hosts = it
 			supportAdapter.visible = it.isNotEmpty() && supportUrl.isNotEmpty()
 			if(top)
@@ -136,8 +139,12 @@ class MainActivity : AppCompatActivity()
 			updateEmptyInfo()
 			connectIfWokenUp(it)
 			connectRegisteredHost(it)
+			// TS5: the hero text shows the focused console, or the first one until something has focus
+			val focused = binding.hostsRecyclerView.focusedChild
+			if(focused == null)
+				it.firstOrNull()?.let { host -> showHero(host) } ?: showHero(null)
 			// With a controller, the first console is ready to be picked right away
-			if(currentFocus == null && it.isNotEmpty() && Preferences(this).isTv)
+			if(currentFocus == null && it.isNotEmpty())
 				binding.hostsRecyclerView.post {
 					binding.hostsRecyclerView.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
 				}
@@ -204,7 +211,36 @@ class MainActivity : AppCompatActivity()
 
 	private fun updateSpanCount()
 	{
-		layoutManager.spanCount = (resources.configuration.screenWidthDp / MIN_CARD_WIDTH_DP).coerceAtLeast(1)
+		// TS5: always one row
+		layoutManager.spanCount = 1
+	}
+
+	/** TS5: the selected console's name and state, large above the row, fading in like a console home screen */
+	private fun showHero(host: DisplayHost?)
+	{
+		val title = binding.heroTitle
+		val subtitle = binding.heroSubtitle
+		val newTitle = host?.let { it.name ?: it.host } ?: ""
+		val state = (host as? com.metallic.chiaki.common.DiscoveredDisplayHost)?.discoveredHost?.state
+		val newSubtitle = when
+		{
+			host == null -> ""
+			!host.isRegistered && host !is com.metallic.chiaki.common.PsnDisplayHost -> getString(R.string.home_hero_register)
+			state == com.metallic.chiaki.lib.DiscoveryHost.State.READY ->
+				(host as com.metallic.chiaki.common.DiscoveredDisplayHost).discoveredHost.runningAppName
+					?.let { getString(R.string.display_host_playing, it) } ?: getString(R.string.home_hero_ready)
+			state == com.metallic.chiaki.lib.DiscoveryHost.State.STANDBY -> getString(R.string.home_hero_standby)
+			else -> getString(R.string.home_hero_play)
+		}
+		if(title.text.toString() == newTitle && subtitle.text.toString() == newSubtitle)
+			return
+		binding.heroLayout.animate().cancel()
+		binding.heroLayout.alpha = 0f
+		binding.heroLayout.translationX = -24f * resources.displayMetrics.density
+		title.text = newTitle
+		subtitle.text = newSubtitle
+		binding.heroLayout.animate().alpha(1f).translationX(0f).setDuration(320)
+			.setInterpolator(android.view.animation.DecelerateInterpolator(2f)).start()
 	}
 
 	private fun showAddConsoleSheet()

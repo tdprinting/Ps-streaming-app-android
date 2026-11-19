@@ -5,7 +5,7 @@
 #define FEEDBACK_STATE_TIMEOUT_MIN_MS 8 // minimum time to wait between sending 2 packets
 #define FEEDBACK_STATE_TIMEOUT_MAX_MS 200 // maximum time to wait between sending 2 packets
 
-// Hayai: how long the sender waits before repeating the controller state when nothing changes.
+// TS5: how long the sender waits before repeating the controller state when nothing changes.
 // A short interval keeps a packet going up every few ms, which stops Wi-Fi from dozing between
 // inputs and then delaying the next one (Artemis' "prevent packet loss" does the same with empty
 // packets every 20 ms).

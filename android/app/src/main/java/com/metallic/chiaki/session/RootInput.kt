@@ -13,7 +13,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
- * Hayai "direct input" (experimental, needs root): reads the built-in gamepad straight from the
+ * TS5 "direct input" (experimental, needs root): reads the built-in gamepad straight from the
  * kernel's /dev/input/eventN instead of through Android's input system.
  *
  * Android's path is kernel → InputReader → InputDispatcher → a socket to the app → the app's UI
@@ -238,7 +238,7 @@ class RootInput private constructor(
 			return false
 		}
 		process = p
-		thread = Thread({ readLoop(p) }, "Hayai direct input").also { it.start() }
+		thread = Thread({ readLoop(p) }, "TS5 direct input").also { it.start() }
 		Log.i(TAG, "Direct input from ${device.path} \"${device.name}\", right stick on " +
 				(if(rightStickOnRx) "RX/RY" else "Z/RZ"))
 		return true

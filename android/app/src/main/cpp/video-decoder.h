@@ -48,18 +48,18 @@ typedef struct android_chiaki_video_decoder_t {
   uint64_t last_sample_us;
   uint32_t gap_max_stats_us;
   uint32_t gap_max_log_us;
-  // Hayai: the same for the poor connection warning
+  // TS5: the same for the poor connection warning
   uint32_t gap_max_health_us;
-  // Hayai: decoded frames that were skipped because a newer one was already
+  // TS5: decoded frames that were skipped because a newer one was already
   // decoded. Read from other threads with __atomic_load_n.
   uint32_t frames_skipped_stale;
-  // Hayai: 0 plain, 1 generic low latency keys, 2 Snapdragon tuned (see
+  // TS5: 0 plain, 1 generic low latency keys, 2 Snapdragon tuned (see
   // video-decoder.c), for the log and the statistics overlay
   int32_t latency_tier;
 } AndroidChiakiVideoDecoder;
 
 /**
- * Hayai latency options, set from Kotlin before a session starts and read when
+ * TS5 latency options, set from Kotlin before a session starts and read when
  * the decoder is created.
  *
  * skip_stale_frames: when the decoder has more than one frame ready (after a

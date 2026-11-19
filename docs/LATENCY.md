@@ -1,8 +1,8 @@
-# Where the delay goes, and what Hayai does about each part
+# Where the delay goes, and what TS5 Streaming does about each part
 
 Rough end-to-end path from pressing a button to seeing the result, for a 1080p60 stream. These are estimates, not measurements. Use the in-stream statistics (the Statistics switch in the stream menu) to see your own decode time and frame gaps.
 
-| Stage | Typical | Who controls it | Hayai |
+| Stage | Typical | Who controls it | TS5 Streaming |
 |---|---|---|---|
 | Button → Android input system | ~1–4 ms | Odin firmware | – (see *root input* below) |
 | Android → app (MotionEvent batching) | 0–16.7 ms at 60 Hz, 0–8.3 at 120 Hz | Android | **Unbuffered dispatch**: 0 |
@@ -17,11 +17,11 @@ Rough end-to-end path from pressing a button to seeing the result, for a 1080p60
 | Panel scan-out | ~16 ms at 60 Hz | Panel | **~8 ms at 120 Hz** |
 | Backed-up frames after a hiccup | +1 refresh each | Display queue | **Newest frame wins** |
 
-Adding up the parts Hayai changes, the best case is roughly **10–20 ms less** than a 60 Hz client with batched input. Most of that comes from the 120 Hz display and unbuffered input. The decoder tuning saves a few ms on top. Tearing mode could save another refresh or two (8–17 ms at 120 Hz) where the Odin's display stack supports it. This is untested on the device yet: check the statistics overlay.
+Adding up the parts TS5 Streaming changes, the best case is roughly **10–20 ms less** than a 60 Hz client with batched input. Most of that comes from the 120 Hz display and unbuffered input. The decoder tuning saves a few ms on top. Tearing mode could save another refresh or two (8–17 ms at 120 Hz) where the Odin's display stack supports it. This is untested on the device yet: check the statistics overlay.
 
 ### Audio path
 
-| Stage | Before (Momiji) | Hayai low latency audio |
+| Stage | Before (Momiji) | TS5 Streaming low latency audio |
 |---|---|---|
 | Opus decode | MediaCodec, a few ms | same |
 | App buffer (absorbs Wi-Fi jitter) | trimmed to 20 ms once it stays above 40 ms for 4 s | **trimmed to 10 ms once it stays above 20 ms for 2 s** |
