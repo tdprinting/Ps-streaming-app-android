@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
+    <!-- The row of consoles on the Android TV home screen -->
+    <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
+    <!-- Low latency Wi-Fi while streaming -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Also for TV boxes, played with a controller -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.gamepad" android:required="false" />
+    <!-- Browsers that can show Sony's sign-in as part of the app -->
+    <queries>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:banner="@drawable/banner"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme"
+        android:resizeableActivity="true"
+        tools:ignore="GoogleAppIndexingWarning">
+
+        <!-- Samsung DeX: keep the app alive when switching between phone and DeX -->
+        <meta-data android:name="com.samsung.android.keepalive.density" android:value="true" />
+        <!-- Samsung DeX: only show the translucent title and task bars of full screen apps
+             once the pointer rests at the edge of the screen -->
+        <meta-data android:name="com.samsung.android.dex.transient_bar_delay" android:value="1500" />
+
+        <provider
+            android:authorities="${applicationId}.fileprovider"
+            android:name="androidx.core.content.FileProvider"
+            android:grantUriPermissions="true"
+            android:exported="false">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/filepaths"
+                />
+        </provider>
+
+        <activity android:name=".main.MainActivity"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Enabled in the settings to make Chiaki the home screen, so a TV box starts into it -->
+        <activity-alias
+            android:name=".main.HomeActivity"
+            android:targetActivity=".main.MainActivity"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Orientation is locked to landscape at runtime, except in DeX/desktop mode where the
+             window must stay freely resizable. Handling the resize-related config changes keeps
+             the stream running when the window is resized or a controller (dis)connects. -->
+        <activity
+            android:name=".stream.StreamActivity"
+            android:taskAffinity=".stream"
+            android:autoRemoveFromRecents="true"
+            android:theme="@style/StreamTheme"
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="true"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|smallestScreenSize|screenLayout|uiMode">
+            <!-- Samsung DeX: open full screen, without the window's title bar -->
+            <meta-data android:name="com.samsung.android.dex.launchwidth" android:value="0" />
+            <meta-data android:name="com.samsung.android.dex.launchheight" android:value="0" />
+        </activity>
+
+        <activity
+            android:name=".settings.SettingsActivity" />
+
+        <activity
+            android:name=".regist.RegistActivity"
+            android:theme="@style/MageTheme"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
+            android:windowSoftInputMode="adjustResize"/>
+
+        <activity
+            android:name=".regist.RegistExecuteActivity"
+            android:theme="@style/MageTheme"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />
+
+        <activity
+            android:name=".regist.PsnSignInActivity"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />
+        <activity
+            android:name=".regist.PsnSignInReturnActivity"
+            android:exported="false" />
+        <!-- Plays the console played last -->
+        <service
+            android:name=".shortcut.PlayTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name=".shortcut.PlayWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_play_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_play_info" />
+        </receiver>
+
+        <activity
+            android:name=".manualconsole.EditManualConsoleActivity"
+            android:theme="@style/MageTheme"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />
+    </application>
+
+</manifest>

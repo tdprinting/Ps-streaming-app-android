@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- A quiet way to support the app: a heart in the toolbar, nothing that pops up -->
+    <item
+        android:id="@+id/action_support"
+        android:icon="@drawable/ic_favorite"
+        android:title="@string/action_support"
+        android:visible="false"
+        app:iconTint="?attr/colorPrimary"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_discover"
+        android:icon="@drawable/ic_discover_on"
+        android:title="@string/action_discover"
+        android:checkable="true"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_settings"
+        android:icon="@drawable/ic_settings"
+        android:title="@string/action_settings"
+        app:showAsAction="ifRoom" />
+
+    <!-- Shown on TV boxes and when Momiji is the home screen, to get to Wi-Fi, Bluetooth etc. -->
+    <item
+        android:id="@+id/action_android_settings"
+        android:title="@string/action_android_settings"
+        android:visible="false"
+        app:showAsAction="never" />
+</menu>

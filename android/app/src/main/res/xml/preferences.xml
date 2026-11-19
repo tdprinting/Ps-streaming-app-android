@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceCategory
+        app:key="category_general"
+        app:title="@string/preferences_category_title_general">
+        <Preference
+            app:key="registered_hosts"
+            tools:summary="@string/preferences_registered_hosts_summary"
+            app:summary=" "
+            app:title="@string/preferences_registered_hosts_title"
+            app:fragment="com.metallic.chiaki.settings.SettingsRegisteredHostsFragment"
+            app:icon="@drawable/ic_console_simple"/>
+
+        <Preference
+            app:key="internet_play"
+            app:title="@string/preferences_internet_play_title"
+            app:summary="@string/preferences_internet_play_summary_off"
+            app:fragment="com.metallic.chiaki.settings.SettingsInternetPlayFragment"
+            app:icon="@drawable/ic_web" />
+
+        <!-- Shown where Android can add the tile from the app -->
+        <Preference
+            app:key="quick_settings_tile"
+            app:title="@string/preferences_tile_title"
+            app:summary="@string/preferences_tile_summary"
+            app:icon="@drawable/ic_tile"
+            app:isPreferenceVisible="false" />
+
+        <SwitchPreference
+            app:key="@string/preferences_home_screen_key"
+            app:title="@string/preferences_home_screen_title"
+            app:summary="@string/preferences_home_screen_summary"
+            app:icon="@drawable/ic_console_simple" />
+
+        <Preference
+            app:key="controllers"
+            app:title="@string/preferences_controllers_title"
+            app:summary="@string/preferences_controllers_summary"
+            app:fragment="com.metallic.chiaki.settings.SettingsControllersFragment"
+            app:icon="@drawable/ic_gamepad" />
+
+        <SwitchPreference
+            app:key="@string/preferences_rumble_enabled_key"
+            app:title="@string/preferences_rumble_enabled_title"
+            app:summary="@string/preferences_rumble_enabled_summary"
+            app:icon="@drawable/ic_rumble" />
+
+        <SwitchPreference
+            app:key="@string/preferences_dualsense_enabled_key"
+            app:title="@string/preferences_dualsense_enabled_title"
+            app:summary="@string/preferences_dualsense_enabled_summary"
+            app:icon="@drawable/ic_rumble" />
+
+        <SwitchPreference
+            app:key="@string/preferences_controller_headphones_key"
+            app:title="@string/preferences_controller_headphones_title"
+            app:summary="@string/preferences_controller_headphones_summary"
+            app:icon="@drawable/ic_headset" />
+
+        <Preference
+            app:key="test_controller_rumble"
+            app:title="@string/preferences_test_rumble_title"
+            app:summary="@string/preferences_test_rumble_summary"
+            app:icon="@drawable/ic_rumble" />
+
+        <SwitchPreference
+            app:key="second_screen"
+            app:title="@string/preferences_second_screen_title"
+            app:summary="@string/preferences_second_screen_summary"
+            app:defaultValue="true"
+            app:isPreferenceVisible="false"
+            app:icon="@drawable/ic_gamepad" />
+
+        <SwitchPreference
+            app:key="preferences_touchscreen_touchpad_enabled"
+            app:title="@string/preferences_touchscreen_touchpad_title"
+            app:summary="@string/preferences_touchscreen_touchpad_summary"
+            app:defaultValue="false"
+            app:icon="@drawable/ic_gamepad" />
+
+        <SwitchPreference
+            app:key="@string/preferences_motion_enabled_key"
+            app:title="@string/preferences_motion_enabled_title"
+            app:summary="@string/preferences_motion_enabled_summary"
+            app:icon="@drawable/ic_motion" />
+
+        <SwitchPreference
+            app:key="@string/preferences_button_haptic_enabled_key"
+            app:title="@string/preferences_button_haptic_enabled_title"
+            app:summary="@string/preferences_button_haptic_enabled_summary"
+            app:icon="@drawable/ic_button_haptic" />
+
+        <SwitchPreference
+            app:key="@string/preferences_log_verbose_key"
+            app:title="@string/preferences_log_verbose_title"
+            app:summary="@string/preferences_log_verbose_summary"
+            app:icon="@drawable/ic_log" />
+
+        <Preference
+            app:key="logs"
+            app:summary="@string/preferences_logs_summary"
+            app:title="@string/preferences_logs_title"
+            app:fragment="com.metallic.chiaki.settings.SettingsLogsFragment"
+            app:icon="@drawable/ic_log"/>
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="category_stream"
+        app:title="@string/preferences_category_title_stream">
+        <ListPreference
+            app:key="stream_quality"
+            app:title="@string/preferences_quality_title"
+            app:icon="@drawable/ic_resolution"/>
+
+        <ListPreference
+            app:key="@string/preferences_resolution_key"
+            app:title="@string/preferences_resolution_title"
+            app:summary="%s"
+            app:icon="@drawable/ic_resolution"/>
+
+        <ListPreference
+            app:key="@string/preferences_fps_key"
+            app:title="@string/preferences_fps_title"
+            app:summary="%s"
+            app:icon="@drawable/ic_fps"/>
+
+        <EditTextPreference
+            app:key="@string/preferences_bitrate_key"
+            app:title="@string/preferences_bitrate_title"
+            app:icon="@drawable/ic_bitrate"/>
+
+        <!-- Shown where the device has picture-in-picture -->
+        <SwitchPreference
+            app:key="stream_picture_in_picture"
+            app:title="@string/preferences_pip_title"
+            app:summary="@string/preferences_pip_summary"
+            app:icon="@drawable/ic_display_normal"
+            app:isPreferenceVisible="false" />
+
+        <ListPreference
+            app:key="@string/preferences_codec_key"
+            app:title="@string/preferences_codec_title"
+            app:summary="%s"
+            app:icon="@drawable/ic_codec"/>
+
+        <!-- Off by default: the shader's extra rendering pass adds delay -->
+        <SwitchPreference
+            app:key="@string/preferences_debanding_key"
+            app:title="@string/preferences_debanding_title"
+            app:summary="@string/preferences_debanding_summary"
+            app:defaultValue="false"
+            app:icon="@drawable/ic_resolution" />
+
+        <!-- Off by default: drawing through shaders adds delay, and it only helps on screens with more
+             pixels than the stream -->
+        <SwitchPreference
+            app:key="@string/preferences_upscaling_key"
+            app:title="@string/preferences_upscaling_title"
+            app:summary="@string/preferences_upscaling_summary"
+            app:defaultValue="false"
+            app:icon="@drawable/ic_super_resolution" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="category_export"
+        app:title="@string/preferences_category_title_export">
+        <Preference
+            app:key="@string/preferences_export_settings_key"
+            app:summary="@string/preferences_export_settings_summary"
+            app:title="@string/preferences_export_settings_title"
+            app:icon="@drawable/ic_export"/>
+
+        <Preference
+            app:key="@string/preferences_import_settings_key"
+            app:summary="@string/preferences_import_settings_summary"
+            app:title="@string/preferences_import_settings_title"
+            app:icon="@drawable/ic_import"/>
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="category_about"
+        app:title="@string/preferences_category_title_about">
+        <Preference
+            app:key="about_version"
+            app:title="@string/app_name"
+            app:summary=" "
+            app:icon="@drawable/ic_logo"
+            app:selectable="false" />
+
+        <Preference
+            app:key="about_support"
+            app:title="@string/action_support"
+            app:summary="@string/support_info"
+            app:icon="@drawable/ic_favorite"
+            app:isPreferenceVisible="false" />
+
+        <Preference
+            app:key="about_feedback"
+            app:title="@string/preferences_about_feedback_title"
+            app:summary="@string/preferences_about_feedback_summary"
+            app:icon="@drawable/ic_feedback" />
+
+        <Preference
+            app:key="about_source"
+            app:title="@string/preferences_about_source_title"
+            app:summary="@string/preferences_about_source_summary"
+            app:icon="@drawable/ic_web">
+            <intent
+                android:action="android.intent.action.VIEW"
+                android:data="@string/source_url" />
+        </Preference>
+
+        <Preference
+            app:key="about_credits"
+            app:title="@string/preferences_about_credits_title"
+            app:summary="@string/preferences_about_credits_summary"
+            app:selectable="false" />
+    </PreferenceCategory>
+</PreferenceScreen>

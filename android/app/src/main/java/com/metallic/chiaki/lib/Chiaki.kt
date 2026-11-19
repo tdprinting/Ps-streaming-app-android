@@ -1,0 +1,796 @@
+package com.metallic.chiaki.lib
+
+import android.os.Parcelable
+import android.util.Log
+import android.view.Surface
+import kotlinx.parcelize.Parcelize
+import java.lang.Exception
+import java.net.InetSocketAddress
+import kotlin.math.abs
+
+enum class Target(val value: Int)
+{
+	PS4_UNKNOWN(0),
+	PS4_8(800),
+	PS4_9(900),
+	PS4_10(1000),
+	PS5_UNKNOWN(1000000),
+	PS5_1(1000100);
+
+	companion object
+	{
+		@JvmStatic
+		fun fromValue(value: Int) = values().firstOrNull { it.value == value } ?: PS4_10
+	}
+
+	val isPS5 get() = value >= PS5_UNKNOWN.value
+}
+
+enum class VideoResolutionPreset(val value: Int)
+{
+	RES_360P(1),
+	RES_540P(2),
+	RES_720P(3),
+	RES_1080P(4)
+}
+
+enum class VideoFPSPreset(val value: Int)
+{
+	FPS_30(30),
+	FPS_60(60)
+}
+
+enum class Codec(val value: Int)
+{
+	CODEC_H264(0),
+	CODEC_H265(1),
+	CODEC_H265_HDR(2)
+}
+
+@Parcelize
+data class ConnectVideoProfile(
+	val width: Int,
+	val height: Int,
+	val maxFPS: Int,
+	val bitrate: Int,
+	val codec: Codec
+): Parcelable
+{
+	companion object
+	{
+		fun preset(resolutionPreset: VideoResolutionPreset, fpsPreset: VideoFPSPreset, codec: Codec)
+				= ChiakiNative.videoProfilePreset(resolutionPreset.value, fpsPreset.value, codec)
+	}
+}
+
+@Parcelize
+data class ConnectInfo(
+	val ps5: Boolean,
+	val host: String,
+	val registKey: ByteArray,
+	val morning: ByteArray,
+	val videoProfile: ConnectVideoProfile,
+	/** Makes the console send adaptive trigger effects and haptics for a DualSense */
+	val enableDualSense: Boolean = false,
+	/** Connects through PSN to the console with this id instead of to host, see [HolepunchDevice.uid] */
+	val psnConsoleUid: ByteArray? = null
+): Parcelable
+
+private class ChiakiNative
+{
+	data class CreateResult(var errorCode: Int, var ptr: Long)
+	companion object
+	{
+		init
+		{
+			System.loadLibrary("chiaki-jni")
+		}
+		@JvmStatic external fun errorCodeToString(value: Int): String
+		@JvmStatic external fun quitReasonToString(value: Int): String
+		@JvmStatic external fun quitReasonIsError(value: Int): Boolean
+		@JvmStatic external fun videoProfilePreset(resolutionPreset: Int, fpsPreset: Int, codec: Codec): ConnectVideoProfile
+		@JvmStatic external fun sessionCreate(result: CreateResult, connectInfo: ConnectInfo, logFile: String?, logVerbose: Boolean, javaSession: Session,
+			holepunch: Long, psnAccountId: ByteArray?)
+		@JvmStatic external fun sessionFree(ptr: Long)
+		@JvmStatic external fun sessionStart(ptr: Long): Int
+		@JvmStatic external fun sessionStop(ptr: Long): Int
+		@JvmStatic external fun sessionJoin(ptr: Long): Int
+		@JvmStatic external fun sessionSetSurface(ptr: Long, surface: Surface?)
+		@JvmStatic external fun sessionSetControllerState(ptr: Long, controllerState: ControllerState)
+		@JvmStatic external fun sessionSetMotion(ptr: Long, gyroX: Float, gyroY: Float, gyroZ: Float, accelX: Float, accelY: Float, accelZ: Float, timestampUs: Int)
+		@JvmStatic external fun sessionSetAudioDevice(ptr: Long, deviceId: Int)
+		@JvmStatic external fun sessionSetHapticsDevice(ptr: Long, deviceId: Int)
+		@JvmStatic external fun sessionSetLoginPin(ptr: Long, pin: String)
+		@JvmStatic external fun sessionGotoBed(ptr: Long): Int
+		@JvmStatic external fun sessionGetStats(ptr: Long, stats: FloatArray)
+		@JvmStatic external fun sessionLogInfo(ptr: Long, text: String)
+		@JvmStatic external fun holepunchListDevices(result: CreateResult, token: String, ps5: Boolean): Array<HolepunchDevice>?
+		@JvmStatic external fun holepunchCreate(token: String, logFile: String?, logVerbose: Boolean): Long
+		@JvmStatic external fun holepunchSessionCreate(ptr: Long): Int
+		@JvmStatic external fun holepunchSessionStart(ptr: Long, consoleUid: ByteArray, ps5: Boolean): Int
+		@JvmStatic external fun holepunchPunchHole(ptr: Long): Int
+		@JvmStatic external fun holepunchCancel(ptr: Long)
+		@JvmStatic external fun holepunchFree(ptr: Long)
+		@JvmStatic external fun discoveryServiceCreate(result: CreateResult, options: DiscoveryServiceOptions, javaService: DiscoveryService)
+		@JvmStatic external fun discoveryServiceFree(ptr: Long)
+		@JvmStatic external fun discoveryServiceWakeup(ptr: Long, host: String, userCredential: Long, ps5: Boolean)
+		@JvmStatic external fun registStart(result: CreateResult, registInfo: RegistInfo, javaLog: ChiakiLog, javaRegist: Regist)
+		@JvmStatic external fun registStop(ptr: Long)
+		@JvmStatic external fun registFree(ptr: Long)
+	}
+}
+
+class ErrorCode(val value: Int)
+{
+	override fun toString() = ChiakiNative.errorCodeToString(value)
+	var isSuccess = value == 0
+
+	companion object
+	{
+		// ChiakiErrorCode
+		const val MEMORY = 4
+		const val NETWORK = 6
+		const val HOST_DOWN = 8
+		const val HOST_UNREACH = 9
+		const val CANCELED = 14
+		const val TIMEOUT = 15
+	}
+}
+
+class ChiakiLog(val levelMask: Int, val callback: (level: Int, text: String) -> Unit)
+{
+	companion object
+	{
+		fun formatLog(level: Int, text: String) =
+			"[${when(level)
+				{
+					Level.DEBUG.value -> "D"
+					Level.VERBOSE.value -> "V"
+					Level.INFO.value -> "I"
+					Level.WARNING.value -> "W"
+					Level.ERROR.value -> "E"
+					else -> "?"
+				}
+			}] $text"
+	}
+
+	enum class Level(val value: Int)
+	{
+		DEBUG(1 shl 4),
+		VERBOSE(1 shl 3),
+		INFO(1 shl 2),
+		WARNING(1 shl 1),
+		ERROR(1 shl 0),
+		ALL(0.inv())
+	}
+
+	private fun log(level: Int, text: String)
+	{
+		callback(level, text)
+	}
+
+	fun d(text: String) = log(Level.DEBUG.value, text)
+	fun v(text: String) = log(Level.VERBOSE.value, text)
+	fun i(text: String) = log(Level.INFO.value, text)
+	fun w(text: String) = log(Level.WARNING.value, text)
+	fun e(text: String) = log(Level.ERROR.value, text)
+}
+
+private fun maxAbs(a: Short, b: Short) = if(abs(a.toInt()) > abs(b.toInt())) a else b
+
+private val CONTROLLER_TOUCHES_MAX = 2 // must be the same as CHIAKI_CONTROLLER_TOUCHES_MAX
+
+data class ControllerTouch(
+	var x: UShort = 0U,
+	var y: UShort = 0U,
+	var id: Byte = -1 // -1 = up
+)
+
+data class ControllerState constructor(
+	var buttons: UInt = 0U,
+	var l2State: UByte = 0U,
+	var r2State: UByte = 0U,
+	var leftX: Short = 0,
+	var leftY: Short = 0,
+	var rightX: Short = 0,
+	var rightY: Short = 0,
+	private var touchIdNext: UByte = 0U,
+	var touches: Array<ControllerTouch> = arrayOf(ControllerTouch(), ControllerTouch()),
+	var gyroX: Float = 0.0f,
+	var gyroY: Float = 0.0f,
+	var gyroZ: Float = 0.0f,
+	var accelX: Float = 0.0f,
+	var accelY: Float = 1.0f,
+	var accelZ: Float = 0.0f,
+	var orientX: Float = 0.0f,
+	var orientY: Float = 0.0f,
+	var orientZ: Float = 0.0f,
+	var orientW: Float = 1.0f
+){
+	companion object
+	{
+		val BUTTON_CROSS 		= (1 shl 0).toUInt()
+		val BUTTON_MOON 		= (1 shl 1).toUInt()
+		val BUTTON_BOX 			= (1 shl 2).toUInt()
+		val BUTTON_PYRAMID 		= (1 shl 3).toUInt()
+		val BUTTON_DPAD_LEFT 	= (1 shl 4).toUInt()
+		val BUTTON_DPAD_RIGHT	= (1 shl 5).toUInt()
+		val BUTTON_DPAD_UP 		= (1 shl 6).toUInt()
+		val BUTTON_DPAD_DOWN 	= (1 shl 7).toUInt()
+		val BUTTON_L1 			= (1 shl 8).toUInt()
+		val BUTTON_R1 			= (1 shl 9).toUInt()
+		val BUTTON_L3			= (1 shl 10).toUInt()
+		val BUTTON_R3			= (1 shl 11).toUInt()
+		val BUTTON_OPTIONS		= (1 shl 12).toUInt()
+		val BUTTON_SHARE 		= (1 shl 13).toUInt()
+		val BUTTON_TOUCHPAD		= (1 shl 14).toUInt()
+		val BUTTON_PS			= (1 shl 15).toUInt()
+		val TOUCHPAD_WIDTH: UShort = 1920U
+		val TOUCHPAD_HEIGHT: UShort = 942U
+	}
+
+	infix fun or(o: ControllerState) = ControllerState(
+		buttons = buttons or o.buttons,
+		l2State = maxOf(l2State, o.l2State),
+		r2State = maxOf(r2State, o.r2State),
+		leftX = maxAbs(leftX, o.leftX),
+		leftY = maxAbs(leftY, o.leftY),
+		rightX = maxAbs(rightX, o.rightX),
+		rightY = maxAbs(rightY, o.rightY),
+		touches = touches.zip(o.touches) { a, b -> if(a.id >= 0) a else b }.toTypedArray(),
+		gyroX = gyroX,
+		gyroY = gyroY,
+		gyroZ = gyroZ,
+		accelX = accelX,
+		accelY = accelY,
+		accelZ = accelZ,
+		orientX = orientX,
+		orientY = orientY,
+		orientZ = orientZ,
+		orientW = orientW
+	)
+
+	override fun equals(other: Any?): Boolean
+	{
+		if(this === other) return true
+		if(javaClass != other?.javaClass) return false
+
+		other as ControllerState
+
+		if(buttons != other.buttons) return false
+		if(l2State != other.l2State) return false
+		if(r2State != other.r2State) return false
+		if(leftX != other.leftX) return false
+		if(leftY != other.leftY) return false
+		if(rightX != other.rightX) return false
+		if(rightY != other.rightY) return false
+		if(touchIdNext != other.touchIdNext) return false
+		if(!touches.contentEquals(other.touches)) return false
+		if(gyroX != other.gyroX) return false
+		if(gyroY != other.gyroY) return false
+		if(gyroZ != other.gyroZ) return false
+		if(accelX != other.accelX) return false
+		if(accelY != other.accelY) return false
+		if(accelZ != other.accelZ) return false
+		if(orientX != other.orientX) return false
+		if(orientY != other.orientY) return false
+		if(orientZ != other.orientZ) return false
+		if(orientW != other.orientW) return false
+
+		return true
+	}
+
+	override fun hashCode(): Int
+	{
+		var result = buttons.hashCode()
+		result = 31 * result + l2State.hashCode()
+		result = 31 * result + r2State.hashCode()
+		result = 31 * result + leftX
+		result = 31 * result + leftY
+		result = 31 * result + rightX
+		result = 31 * result + rightY
+		result = 31 * result + touchIdNext.hashCode()
+		result = 31 * result + touches.contentHashCode()
+		result = 31 * result + gyroX.hashCode()
+		result = 31 * result + gyroY.hashCode()
+		result = 31 * result + gyroZ.hashCode()
+		result = 31 * result + accelX.hashCode()
+		result = 31 * result + accelY.hashCode()
+		result = 31 * result + accelZ.hashCode()
+		result = 31 * result + orientX.hashCode()
+		result = 31 * result + orientY.hashCode()
+		result = 31 * result + orientZ.hashCode()
+		result = 31 * result + orientW.hashCode()
+		return result
+	}
+
+	fun startTouch(x: UShort, y: UShort): UByte? =
+		touches
+			.find { it.id < 0 }
+			?.also {
+				it.id = touchIdNext.toByte()
+				it.x = x
+				it.y = y
+				touchIdNext = ((touchIdNext + 1U) and 0x7fU).toUByte()
+			}?.id?.toUByte()
+
+	fun stopTouch(id: UByte)
+	{
+		touches.find {
+			it.id >= 0 && it.id == id.toByte()
+		}?.let {
+			it.id = -1
+		}
+	}
+
+	fun setTouchPos(id: UByte, x: UShort, y: UShort): Boolean
+		= touches.find {
+			it.id >= 0 && it.id == id.toByte()
+		}?.let {
+			val r = it.x != x || it.y != y
+			it.x = x
+			it.y = y
+			r
+		} ?: false
+}
+
+class QuitReason(val value: Int)
+{
+	override fun toString() = ChiakiNative.quitReasonToString(value)
+
+	val isError = ChiakiNative.quitReasonIsError(value)
+
+	/** The console is in another Remote Play session, which it still is for some seconds after one ended */
+	val isRpInUse get() = value == SESSION_REQUEST_RP_IN_USE
+
+	companion object
+	{
+		// ChiakiQuitReason
+		const val SESSION_REQUEST_UNKNOWN = 2
+		const val SESSION_REQUEST_CONNECTION_REFUSED = 3
+		const val SESSION_REQUEST_RP_IN_USE = 4
+		const val SESSION_REQUEST_RP_CRASH = 5
+		const val SESSION_REQUEST_RP_VERSION_MISMATCH = 6
+		const val CTRL_UNKNOWN = 7
+		const val CTRL_CONNECT_FAILED = 8
+		const val CTRL_CONNECTION_REFUSED = 9
+		const val STREAM_CONNECTION_UNKNOWN = 10
+		const val STREAM_CONNECTION_REMOTE_DISCONNECTED = 11
+		const val PSN_REGIST_FAILED = 13
+	}
+}
+
+sealed class Event
+object ConnectedEvent: Event()
+data class LoginPinRequestEvent(val pinIncorrect: Boolean): Event()
+data class QuitEvent(val reason: QuitReason, val reasonString: String?): Event()
+data class RumbleEvent(val left: UByte, val right: UByte): Event()
+/** Vibration derived from the DualSense haptics audio, 0-255 per side */
+data class HapticsEvent(val left: Int, val right: Int): Event()
+/** Raw DualSense trigger effects: mode byte and 10 parameter bytes per trigger */
+class TriggerEffectsEvent(val typeLeft: Int, val typeRight: Int, val left: ByteArray, val right: ByteArray): Event()
+/** The console shows something that it doesn't stream, the video is black meanwhile */
+data class CantDisplayEvent(val cantDisplay: Boolean): Event()
+data class LedColorEvent(val red: Int, val green: Int, val blue: Int): Event()
+data class HapticIntensityEvent(val intensity: DualSenseIntensity): Event()
+data class TriggerIntensityEvent(val intensity: DualSenseIntensity): Event()
+
+/** The console's vibration and trigger effect intensity settings */
+enum class DualSenseIntensity(val value: Int)
+{
+	OFF(0),
+	STRONG(1),
+	MEDIUM(2),
+	WEAK(3);
+
+	companion object
+	{
+		fun fromValue(value: Int) = values().firstOrNull { it.value == value } ?: STRONG
+	}
+}
+
+class CreateError(val errorCode: ErrorCode): Exception("Failed to create a native object: $errorCode")
+
+/** A console of a PSN account */
+class HolepunchDevice(nameBytes: ByteArray, val uid: ByteArray, val ps5: Boolean, val remotePlayEnabled: Boolean)
+{
+	val name = String(nameBytes, Charsets.UTF_8)
+
+	/** The name as discovery and registration have it, which turn each byte outside of ASCII into '?' */
+	val asciiName = String(ByteArray(nameBytes.size) { if(nameBytes[it] < 0) '?'.code.toByte() else nameBytes[it] }, Charsets.US_ASCII)
+
+	companion object
+	{
+		/**
+		 * Blocks for the network requests.
+		 * @throws CreateError
+		 */
+		fun list(token: String, ps5: Boolean): List<HolepunchDevice>
+		{
+			val result = ChiakiNative.CreateResult(0, 0)
+			val devices = ChiakiNative.holepunchListDevices(result, token, ps5)
+			if(devices == null)
+				throw CreateError(ErrorCode(result.errorCode))
+			return devices.toList()
+		}
+	}
+}
+
+/**
+ * Connects to a console through PSN, in the order of its steps, on a background thread as each
+ * one blocks. A [Session] then takes it over, or [free] ends it.
+ */
+class HolepunchConnection(token: String, logFile: String?, logVerbose: Boolean)
+{
+	private val lock = Any()
+	private var nativePtr = ChiakiNative.holepunchCreate(token, logFile, logVerbose)
+	private var canceled = false
+
+	init
+	{
+		if(nativePtr == 0L)
+			throw CreateError(ErrorCode(ErrorCode.MEMORY))
+	}
+
+	/** Creates the session on PSN, which the console joins */
+	fun createSession() = step { ChiakiNative.holepunchSessionCreate(it) }
+
+	/** Asks the console to join the session, and wakes it up from rest mode */
+	fun startSession(consoleUid: ByteArray, ps5: Boolean) = step { ChiakiNative.holepunchSessionStart(it, consoleUid, ps5) }
+
+	/** Opens the connection to the console through the routers on both ends */
+	fun punchHole() = step { ChiakiNative.holepunchPunchHole(it) }
+
+	private fun step(action: (Long) -> Int): ErrorCode
+	{
+		val ptr = synchronized(lock) {
+			if(canceled || nativePtr == 0L)
+				return ErrorCode(ErrorCode.CANCELED)
+			nativePtr
+		}
+		return ErrorCode(action(ptr))
+	}
+
+	/** Makes the running step return soon, from any thread. The connection still has to be freed. */
+	fun cancel() = synchronized(lock) {
+		if(!canceled && nativePtr != 0L)
+		{
+			canceled = true
+			ChiakiNative.holepunchCancel(nativePtr)
+		}
+	}
+
+	/** @return the native connection for a session to take over, or null if canceled */
+	internal fun takeOver(): Long? = synchronized(lock) {
+		val ptr = nativePtr.takeIf { !canceled && it != 0L }
+		if(ptr != null)
+			nativePtr = 0L
+		ptr
+	}
+
+	/** Blocks for a few seconds while it removes the session from PSN */
+	fun free()
+	{
+		val ptr = synchronized(lock) { nativePtr.also { nativePtr = 0L } }
+		if(ptr != 0L)
+			ChiakiNative.holepunchFree(ptr)
+	}
+}
+
+/** Numbers for the stream statistics overlay */
+data class StreamStats(
+	val bitrateMbps: Float,
+	/** 0 to 1 */
+	val packetLoss: Float,
+	/** Measured when connecting */
+	val pingMs: Float,
+	val framesRendered: Long,
+	val decodeMsAverage: Float,
+	val decodeMsMax: Float,
+	/** The longest wait between two frames from the network since the last call */
+	val frameGapMsMax: Float,
+	/** The audio buffer's lowest level over the last few seconds */
+	val audioBufferMs: Float
+)
+
+/**
+ * @param holepunch a connection through PSN that the session takes over, with its log instead of logFile
+ * @param psnAccountId the account id of the PSN sign-in, 8 bytes, for a connection through PSN
+ */
+class Session(connectInfo: ConnectInfo, logFile: String?, logVerbose: Boolean,
+	holepunch: HolepunchConnection? = null, psnAccountId: ByteArray? = null)
+{
+	interface EventCallback
+	{
+		fun sessionEvent(event: Event)
+	}
+
+	/**
+	 * Calls come from several threads (a controller's motion sensors report on their own),
+	 * so they hold this lock, and freeing the session waits for the ones already running.
+	 */
+	private val lock = Any()
+	/** Guarded by lock, 0 once freed */
+	private var nativePtr: Long
+	var eventCallback: ((event: Event) -> Unit)? = null
+
+	init
+	{
+		val holepunchPtr = holepunch?.let { it.takeOver() ?: throw CreateError(ErrorCode(ErrorCode.CANCELED)) } ?: 0L
+		val result = ChiakiNative.CreateResult(0, 0)
+		ChiakiNative.sessionCreate(result, connectInfo, logFile, logVerbose, this, holepunchPtr, psnAccountId)
+		val errorCode = ErrorCode(result.errorCode)
+		if(!errorCode.isSuccess)
+			throw CreateError(errorCode)
+		nativePtr = result.ptr
+	}
+
+	/** Runs block with the native session, or returns null once it was freed */
+	private inline fun <T> withNative(block: (ptr: Long) -> T): T? = synchronized(lock) {
+		nativePtr.takeIf { it != 0L }?.let(block)
+	}
+
+	fun start() = ErrorCode(withNative { ChiakiNative.sessionStart(it) } ?: ErrorCode.CANCELED)
+	fun stop() = ErrorCode(withNative { ChiakiNative.sessionStop(it) } ?: ErrorCode.CANCELED)
+
+	fun dispose()
+	{
+		// Calls that already started finish first, later ones do nothing
+		val ptr = synchronized(lock) { nativePtr.also { nativePtr = 0L } }
+		if(ptr == 0L)
+			return
+		ChiakiNative.sessionJoin(ptr)
+		ChiakiNative.sessionFree(ptr)
+	}
+
+	private fun event(event: Event)
+	{
+		eventCallback?.let { it(event) }
+	}
+
+	private fun eventConnected()
+	{
+		event(ConnectedEvent)
+	}
+
+	private fun eventLoginPinRequest(pinIncorrect: Boolean)
+	{
+		event(LoginPinRequestEvent(pinIncorrect))
+	}
+
+	private fun eventQuit(reasonValue: Int, reasonString: String?)
+	{
+		event(QuitEvent(QuitReason(reasonValue), reasonString))
+	}
+
+	private fun eventRumble(left: Int, right: Int)
+	{
+		event(RumbleEvent(left.toUByte(), right.toUByte()))
+	}
+
+	private fun eventHaptics(left: Int, right: Int)
+	{
+		event(HapticsEvent(left, right))
+	}
+
+	private fun eventTriggerEffects(typeLeft: Int, typeRight: Int, left: ByteArray, right: ByteArray)
+	{
+		event(TriggerEffectsEvent(typeLeft, typeRight, left, right))
+	}
+
+	private fun eventCantDisplay(cantDisplay: Boolean)
+	{
+		event(CantDisplayEvent(cantDisplay))
+	}
+
+	private fun eventLedColor(red: Int, green: Int, blue: Int)
+	{
+		event(LedColorEvent(red, green, blue))
+	}
+
+	private fun eventHapticIntensity(value: Int)
+	{
+		event(HapticIntensityEvent(DualSenseIntensity.fromValue(value)))
+	}
+
+	private fun eventTriggerIntensity(value: Int)
+	{
+		event(TriggerIntensityEvent(DualSenseIntensity.fromValue(value)))
+	}
+
+	fun setSurface(surface: Surface?)
+	{
+		withNative { ChiakiNative.sessionSetSurface(it, surface) }
+	}
+
+	fun setControllerState(controllerState: ControllerState)
+	{
+		withNative { ChiakiNative.sessionSetControllerState(it, controllerState) }
+	}
+
+	fun setLoginPin(pin: String)
+	{
+		withNative { ChiakiNative.sessionSetLoginPin(it, pin) }
+	}
+
+	/** Puts the console in rest mode, once connected */
+	fun gotoBed() = ErrorCode(withNative { ChiakiNative.sessionGotoBed(it) } ?: ErrorCode.CANCELED)
+
+	/** Writes a line into the session's log */
+	fun logInfo(text: String)
+	{
+		withNative { ChiakiNative.sessionLogInfo(it, text) }
+	}
+
+	fun getStats(): StreamStats?
+	{
+		val stats = FloatArray(8)
+		withNative { ChiakiNative.sessionGetStats(it, stats) } ?: return null
+		return StreamStats(stats[0], stats[1], stats[2], stats[3].toLong(), stats[4], stats[5], stats[6], stats[7])
+	}
+
+	/**
+	 * Motion of the controller itself (rad/s and g), which then replaces the motion
+	 * in the controller states, including the orientation derived from it.
+	 */
+	fun setMotion(gyroX: Float, gyroY: Float, gyroZ: Float, accelX: Float, accelY: Float, accelZ: Float, timestampUs: Int)
+	{
+		withNative { ChiakiNative.sessionSetMotion(it, gyroX, gyroY, gyroZ, accelX, accelY, accelZ, timestampUs) }
+	}
+
+	/**
+	 * @param deviceId [android.media.AudioDeviceInfo.getId] to play the audio on, 0 for the system's choice
+	 */
+	fun setAudioDevice(deviceId: Int)
+	{
+		withNative { ChiakiNative.sessionSetAudioDevice(it, deviceId) }
+	}
+
+	/**
+	 * @param deviceId [android.media.AudioDeviceInfo.getId] of a DualSense's USB audio to play the haptics on, 0 for none
+	 */
+	fun setHapticsDevice(deviceId: Int)
+	{
+		withNative { ChiakiNative.sessionSetHapticsDevice(it, deviceId) }
+	}
+}
+
+data class DiscoveryHost(
+	val state: State,
+	val hostRequestPort: UShort,
+	val hostAddr: String?,
+	val systemVersion: String?,
+	val deviceDiscoveryProtocolVersion: String?,
+	val hostName: String?,
+	val hostType: String?,
+	val hostId: String?,
+	val runningAppTitleid: String?,
+	val runningAppName: String?)
+{
+	enum class State
+	{
+		UNKNOWN,
+		READY,
+		STANDBY
+	}
+	
+	val isPS5 get() = deviceDiscoveryProtocolVersion == "00030010"
+}
+
+
+data class DiscoveryServiceOptions(
+	val hostsMax: ULong,
+	val hostDropPings: ULong,
+	val pingMs: ULong,
+	val sendAddr: InetSocketAddress
+)
+
+class DiscoveryService(
+	options: DiscoveryServiceOptions,
+	val callback: ((hosts: List<DiscoveryHost>) -> Unit)?)
+{
+	companion object
+	{
+		fun wakeup(service: DiscoveryService?, host: String, userCredential: ULong, ps5: Boolean) =
+			ChiakiNative.discoveryServiceWakeup(service?.nativePtr ?: 0, host, userCredential.toLong(), ps5)
+	}
+
+	private var nativePtr: Long
+
+	init
+	{
+		val result = ChiakiNative.CreateResult(0, 0)
+		ChiakiNative.discoveryServiceCreate(result, options, this)
+		val errorCode = ErrorCode(result.errorCode)
+		if(!errorCode.isSuccess)
+			throw CreateError(errorCode)
+		nativePtr = result.ptr
+	}
+
+	fun dispose()
+	{
+		if(nativePtr == 0L)
+			return
+		ChiakiNative.discoveryServiceFree(nativePtr)
+		nativePtr = 0L
+	}
+
+	private fun hostsUpdated(hosts: Array<DiscoveryHost>)
+	{
+		val hostsList = hosts.toList()
+		Log.i("Chiaki", "got hosts from native: $hostsList")
+		callback?.let { it(hostsList) }
+	}
+
+}
+
+@Parcelize
+data class RegistInfo(
+	val target: Target,
+	val host: String,
+	val broadcast: Boolean,
+	val psnOnlineId: String?,
+	val psnAccountId: ByteArray?,
+	val pin: Int
+): Parcelable
+{
+	companion object
+	{
+		const val ACCOUNT_ID_SIZE = 8
+	}
+}
+
+data class RegistHost(
+	val target: Target,
+	val apSsid: String,
+	val apBssid: String,
+	val apKey: String,
+	val apName: String,
+	val serverMac: ByteArray,
+	val serverNickname: String,
+	val rpRegistKey: ByteArray,
+	val rpKeyType: UInt,
+	val rpKey: ByteArray
+)
+
+sealed class RegistEvent
+object RegistEventCanceled: RegistEvent()
+object RegistEventFailed: RegistEvent()
+class RegistEventSuccess(val host: RegistHost): RegistEvent()
+
+class Regist(
+	info: RegistInfo,
+	log: ChiakiLog,
+	val callback: (RegistEvent) -> Unit
+)
+{
+	private var nativePtr: Long
+
+	init
+	{
+		val result = ChiakiNative.CreateResult(0, 0)
+		ChiakiNative.registStart(result, info, log, this)
+		val errorCode = ErrorCode(result.errorCode)
+		if(!errorCode.isSuccess)
+			throw CreateError(errorCode)
+		nativePtr = result.ptr
+	}
+
+	fun stop()
+	{
+		ChiakiNative.registStop(nativePtr)
+	}
+
+	fun dispose()
+	{
+		if(nativePtr == 0L)
+			return
+		ChiakiNative.registFree(nativePtr)
+		nativePtr = 0L
+	}
+
+	private fun event(event: RegistEvent)
+	{
+		callback(event)
+	}
+}
