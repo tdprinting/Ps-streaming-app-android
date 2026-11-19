@@ -10,6 +10,7 @@
 
 #include <chiaki/time.h>
 
+#include <dlfcn.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -33,6 +34,62 @@ void android_chiaki_video_decoder_set_latency_options(bool skip_stale_frames,
   latency_skip_stale_frames = skip_stale_frames;
   latency_snapdragon_tuning = snapdragon_tuning;
   latency_snapdragon_early_output = snapdragon_early_output;
+}
+
+/*
+ * TS5: Android's Performance Hint API (ADPF, Android 13+). A stream's CPU work comes in short
+ * bursts every frame, which the CPU governor follows slowly (it can take ~200 ms to ramp), so the
+ * network, input, video and audio threads may run at low clocks right when a frame arrives. A hint
+ * session tells the system these threads must finish each frame's work within a target, and the
+ * decode time is reported every frame, so the clocks rise as soon as frames take longer.
+ * Loaded with dlsym, so the app still runs on older Android versions.
+ */
+typedef struct ts5_hint_manager ts5_hint_manager;
+typedef struct ts5_hint_session ts5_hint_session;
+static ts5_hint_manager *(*hint_get_manager)(void);
+static ts5_hint_session *(*hint_create_session)(ts5_hint_manager *, const int32_t *, size_t, int64_t);
+static int (*hint_report)(ts5_hint_session *, int64_t);
+static void (*hint_close)(ts5_hint_session *);
+
+// The work each frame should fit in: decode plus getting it on screen
+#define HINT_TARGET_NS 4000000LL
+// Frames after which all the stream's threads are running and can join the session
+#define HINT_START_FRAMES 30
+
+static bool hint_load(void) {
+  static int loaded = 0; // 0 not tried, 1 ok, -1 unavailable
+  if (loaded)
+    return loaded > 0;
+  loaded = -1;
+  void *lib = dlopen("libandroid.so", RTLD_NOW);
+  if (!lib)
+    return false;
+  hint_get_manager = dlsym(lib, "APerformanceHint_getManager");
+  hint_create_session = dlsym(lib, "APerformanceHint_createSession");
+  hint_report = dlsym(lib, "APerformanceHint_reportActualWorkDuration");
+  hint_close = dlsym(lib, "APerformanceHint_closeSession");
+  if (hint_get_manager && hint_create_session && hint_report && hint_close)
+    loaded = 1;
+  return loaded > 0;
+}
+
+static ts5_hint_session *hint_start(ChiakiLog *log) {
+  if (!hint_load())
+    return NULL;
+  ts5_hint_manager *manager = hint_get_manager();
+  if (!manager)
+    return NULL;
+  int32_t tids[16];
+  size_t count = chiaki_thread_hot_tids(tids, 16);
+  if (!count)
+    return NULL;
+  ts5_hint_session *session = hint_create_session(manager, tids, count, HINT_TARGET_NS);
+  if (session)
+    CHIAKI_LOGI(log, "Performance hint session for %d stream threads, target %.1f ms",
+                (int)count, HINT_TARGET_NS / 1e6);
+  else
+    CHIAKI_LOGI(log, "Performance hint sessions aren't available on this device");
+  return session;
 }
 
 /** Decoder tiers, from most to least aggressive */
@@ -439,7 +496,8 @@ static void *android_chiaki_video_decoder_output_thread_func(void *user) {
     CHIAKI_LOGW(decoder->log, "Video decoder failed to raise its output thread's priority");
 
   bool skip_stale = latency_skip_stale_frames;
-
+  ts5_hint_session *hint_session = NULL;
+  bool hint_tried = false;
   while (1) {
     AMediaCodecBufferInfo info;
     ssize_t status = AMediaCodec_dequeueOutputBuffer(decoder->codec, &info, -1);
@@ -472,8 +530,21 @@ static void *android_chiaki_video_decoder_output_thread_func(void *user) {
       else
         AMediaCodec_releaseOutputBuffer(decoder->codec, (size_t)status, false);
       if (info.size != 0) {
-        __atomic_add_fetch(&decoder->frames_rendered, 1, __ATOMIC_RELAXED);
+        uint32_t rendered = __atomic_add_fetch(&decoder->frames_rendered, 1, __ATOMIC_RELAXED);
         track_latency(decoder, (uint64_t)info.presentationTimeUs);
+        if (!hint_tried && rendered >= HINT_START_FRAMES) {
+          hint_tried = true;
+          hint_session = hint_start(decoder->log);
+        }
+        if (hint_session) {
+          uint64_t queued = decoder->queued_us[(uint64_t)info.presentationTimeUs %
+                                               ANDROID_CHIAKI_VIDEO_DECODER_LATENCY_SLOTS];
+          if (queued) {
+            int64_t work_ns = (int64_t)(chiaki_time_now_monotonic_us() - queued) * 1000;
+            if (work_ns > 0)
+              hint_report(hint_session, work_ns);
+          }
+        }
       }
       if (info.flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) {
         CHIAKI_LOGI(decoder->log, "AMediaCodec reported EOS");
@@ -491,7 +562,8 @@ static void *android_chiaki_video_decoder_output_thread_func(void *user) {
     }
   }
 
+  if (hint_session)
+    hint_close(hint_session);
   CHIAKI_LOGI(decoder->log, "Video Decoder Output Thread exiting");
-
   return NULL;
 }

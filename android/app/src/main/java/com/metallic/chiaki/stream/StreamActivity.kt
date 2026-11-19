@@ -99,7 +99,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		// TS5: read by the native video decoder when it is created for this stream
 		Preferences(this).let {
 			LatencyOptions.apply(it.skipStaleFrames, it.snapdragonTuning, it.snapdragonEarlyOutput,
-				it.lowLatencyAudio, it.bigCores, if(it.keepWifiAwake) 20 else 0)
+				it.lowLatencyAudio, it.bigCores, if(it.keepWifiAwake) 20 else 0, it.inputRedundancy)
 			LatencyOptions.setControllerOnly(it.controllerOnly)
 		}
 

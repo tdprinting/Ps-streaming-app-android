@@ -199,6 +199,12 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getBoolean(controllerOnlyKey, false)
 		set(value) { sharedPreferences.edit().putBoolean(controllerOnlyKey, value).apply() }
 
+	/** TS5: send every input event again 2 and 6 ms later, so a packet lost on Wi-Fi costs ~2 ms */
+	val inputRedundancyKey get() = "latency_input_redundancy"
+	var inputRedundancy
+		get() = sharedPreferences.getBoolean(inputRedundancyKey, true)
+		set(value) { sharedPreferences.edit().putBoolean(inputRedundancyKey, value).apply() }
+
 	/** TS5: repeat the controller state every 20 ms so Wi-Fi never dozes between inputs */
 	val keepWifiAwakeKey get() = "latency_keep_wifi_awake"
 	var keepWifiAwake

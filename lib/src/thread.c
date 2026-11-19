@@ -103,9 +103,54 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_thread_set_name(ChiakiThread *thread, const
 
 #ifdef __ANDROID__
 #include <sched.h>
+#include <string.h>
 #include <unistd.h>
 
 static volatile bool prefer_big_cores = true;
+
+// TS5: threads that raised their priority, see chiaki_thread_hot_tids()
+#define HOT_TIDS_MAX 16
+static int32_t hot_tids[HOT_TIDS_MAX];
+static size_t hot_tids_count = 0;
+static pthread_mutex_t hot_tids_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static void remember_hot_tid(void)
+{
+	int32_t tid = (int32_t)gettid();
+	pthread_mutex_lock(&hot_tids_mutex);
+	bool known = false;
+	for(size_t i = 0; i < hot_tids_count; i++)
+		if(hot_tids[i] == tid)
+			known = true;
+	if(!known)
+	{
+		if(hot_tids_count < HOT_TIDS_MAX)
+			hot_tids[hot_tids_count++] = tid;
+		else
+		{
+			// Old sessions' threads are gone: start over with the newest
+			memmove(hot_tids, hot_tids + 1, (HOT_TIDS_MAX - 1) * sizeof(int32_t));
+			hot_tids[HOT_TIDS_MAX - 1] = tid;
+		}
+	}
+	pthread_mutex_unlock(&hot_tids_mutex);
+}
+
+CHIAKI_EXPORT size_t chiaki_thread_hot_tids(int32_t *tids, size_t max)
+{
+	pthread_mutex_lock(&hot_tids_mutex);
+	// Only threads that still exist
+	size_t n = 0;
+	for(size_t i = 0; i < hot_tids_count && n < max; i++)
+	{
+		char path[64];
+		snprintf(path, sizeof(path), "/proc/self/task/%d", (int)hot_tids[i]);
+		if(access(path, F_OK) == 0)
+			tids[n++] = hot_tids[i];
+	}
+	pthread_mutex_unlock(&hot_tids_mutex);
+	return n;
+}
 
 CHIAKI_EXPORT void chiaki_thread_set_prefer_big_cores(bool enabled)
 {
@@ -159,13 +204,24 @@ CHIAKI_EXPORT void chiaki_thread_set_prefer_big_cores(bool enabled)
 {
 	(void)enabled;
 }
+
+CHIAKI_EXPORT size_t chiaki_thread_hot_tids(int32_t *tids, size_t max)
+{
+	(void)tids;
+	(void)max;
+	return 0;
+}
 #endif
 
 CHIAKI_EXPORT ChiakiErrorCode chiaki_thread_set_current_nice(int nice)
 {
 #ifdef __ANDROID__
-	if(prefer_big_cores && nice < 0)
-		pin_current_thread_to_big_cores();
+	if(nice < 0)
+	{
+		remember_hot_tid();
+		if(prefer_big_cores)
+			pin_current_thread_to_big_cores();
+	}
 	// On Linux, nice applies to the calling thread only
 	if(setpriority(PRIO_PROCESS, 0, nice) != 0)
 		return CHIAKI_ERR_UNKNOWN;

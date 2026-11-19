@@ -227,6 +227,12 @@
             app:icon="@drawable/ic_fps" />
 
         <SwitchPreference
+            app:key="latency_input_redundancy"
+            app:title="@string/preferences_input_redundancy_title"
+            app:summary="@string/preferences_input_redundancy_summary"
+            app:icon="@drawable/ic_fps" />
+
+        <SwitchPreference
             app:key="latency_keep_wifi_awake"
             app:title="@string/preferences_keep_wifi_awake_title"
             app:summary="@string/preferences_keep_wifi_awake_summary"

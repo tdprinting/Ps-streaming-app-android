@@ -61,6 +61,7 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 		preferences.directInputKey -> preferences.directInput
 		preferences.keepWifiAwakeKey -> preferences.keepWifiAwake
 		preferences.controllerOnlyKey -> preferences.controllerOnly
+		preferences.inputRedundancyKey -> preferences.inputRedundancy
 		preferences.connectionWarningsKey -> preferences.connectionWarnings
 		else -> defValue
 	}
@@ -91,6 +92,7 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 			preferences.directInputKey -> preferences.directInput = value
 			preferences.keepWifiAwakeKey -> preferences.keepWifiAwake = value
 			preferences.controllerOnlyKey -> preferences.controllerOnly = value
+			preferences.inputRedundancyKey -> preferences.inputRedundancy = value
 			preferences.connectionWarningsKey -> preferences.connectionWarnings = value
 		}
 	}

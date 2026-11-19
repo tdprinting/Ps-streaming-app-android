@@ -104,7 +104,8 @@ private class ChiakiNative
 		@JvmStatic external fun sessionGotoBed(ptr: Long): Int
 		@JvmStatic external fun sessionGetStats(ptr: Long, stats: FloatArray)
 		@JvmStatic external fun setLatencyOptions(skipStaleFrames: Boolean, snapdragonTuning: Boolean,
-			snapdragonEarlyOutput: Boolean, lowLatencyAudio: Boolean, bigCores: Boolean, keepaliveMs: Int)
+			snapdragonEarlyOutput: Boolean, lowLatencyAudio: Boolean, bigCores: Boolean, keepaliveMs: Int,
+			inputRedundancy: Boolean)
 		@JvmStatic external fun sessionGetHealth(ptr: Long, health: FloatArray)
 		@JvmStatic external fun setControllerOnly(enabled: Boolean)
 		@JvmStatic external fun sessionLogInfo(ptr: Long, text: String)
@@ -509,8 +510,9 @@ data class StreamStats(
 object LatencyOptions
 {
 	fun apply(skipStaleFrames: Boolean, snapdragonTuning: Boolean, snapdragonEarlyOutput: Boolean,
-		lowLatencyAudio: Boolean, bigCores: Boolean, keepaliveMs: Int) =
-		ChiakiNative.setLatencyOptions(skipStaleFrames, snapdragonTuning, snapdragonEarlyOutput, lowLatencyAudio, bigCores, keepaliveMs)
+		lowLatencyAudio: Boolean, bigCores: Boolean, keepaliveMs: Int, inputRedundancy: Boolean) =
+		ChiakiNative.setLatencyOptions(skipStaleFrames, snapdragonTuning, snapdragonEarlyOutput, lowLatencyAudio, bigCores,
+			keepaliveMs, inputRedundancy)
 
 	/** TS5: the console sends no video or audio, for using this device as a controller only */
 	fun setControllerOnly(enabled: Boolean) = ChiakiNative.setControllerOnly(enabled)

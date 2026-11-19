@@ -197,6 +197,11 @@ static void takion_set_qos(ChiakiTakion *takion, int family)
 		CHIAKI_LOGW(takion->log, "Takion failed to mark packets for QoS: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
 	else
 		CHIAKI_LOGI(takion->log, "Takion marked packets DSCP EF for Wi-Fi priority");
+	// TS5: also the highest priority an app may set for the device's own transmit queue (0 to 6
+	// without special permissions), so input leaves ahead of other apps' uploads
+	const int priority = 6;
+	if(setsockopt(takion->sock, SOL_SOCKET, SO_PRIORITY, &priority, sizeof(priority)) < 0)
+		CHIAKI_LOGW(takion->log, "Takion failed to set socket priority: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
 }
 #else
 static void takion_set_qos(ChiakiTakion *takion, int family)

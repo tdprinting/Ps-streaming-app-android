@@ -826,8 +826,10 @@ JNIEXPORT void JNICALL JNI_FCN(sessionGetHealth)(JNIEnv *env, jobject obj, jlong
 }
 
 JNIEXPORT void JNICALL JNI_FCN(setLatencyOptions)(JNIEnv *env, jobject obj, jboolean skip_stale_frames, jboolean snapdragon_tuning,
-		jboolean snapdragon_early_output, jboolean low_latency_audio, jboolean big_cores, jint keepalive_ms)
+		jboolean snapdragon_early_output, jboolean low_latency_audio, jboolean big_cores, jint keepalive_ms,
+		jboolean input_redundancy)
 {
+	chiaki_feedback_sender_set_input_redundancy(input_redundancy);
 	chiaki_feedback_sender_set_keepalive_ms((uint64_t)(keepalive_ms > 0 ? keepalive_ms : 0));
 	android_chiaki_video_decoder_set_latency_options(skip_stale_frames, snapdragon_tuning, snapdragon_early_output);
 	android_chiaki_audio_output_set_low_latency(low_latency_audio);

@@ -51,6 +51,13 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_thread_set_current_nice(int nice);
  */
 CHIAKI_EXPORT void chiaki_thread_set_prefer_big_cores(bool enabled);
 
+/**
+ * TS5: the Linux thread ids of the threads that raised their priority with
+ * chiaki_thread_set_current_nice() (the stream's network, input, video and audio threads), for a
+ * performance hint session. Returns how many were written to tids, at most max.
+ */
+CHIAKI_EXPORT size_t chiaki_thread_hot_tids(int32_t *tids, size_t max);
+
 
 typedef struct chiaki_mutex_t
 {

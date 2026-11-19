@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-AGPL-3.0-only-OpenSSL
 
 #include <chiaki/feedbacksender.h>
+#include <chiaki/time.h>
+
+#include <stdint.h>
+#include <string.h>
 
 #define FEEDBACK_STATE_TIMEOUT_MIN_MS 8 // minimum time to wait between sending 2 packets
 #define FEEDBACK_STATE_TIMEOUT_MAX_MS 200 // maximum time to wait between sending 2 packets
@@ -14,6 +18,51 @@ static volatile uint64_t feedback_state_keepalive_ms = FEEDBACK_STATE_TIMEOUT_MA
 CHIAKI_EXPORT void chiaki_feedback_sender_set_keepalive_ms(uint64_t ms)
 {
 	feedback_state_keepalive_ms = ms ? ms : FEEDBACK_STATE_TIMEOUT_MAX_MS;
+}
+
+// TS5 input redundancy. Every history packet carries the newest events and the number of the
+// newest one; the console applies only the events it hasn't seen, so the same packet sent again
+// changes nothing if the first copy arrived, and delivers the event if it was lost. Fighting-game
+// netcode (GGPO) sends redundant inputs for the same reason.
+static const uint64_t history_resend_fast_ms[] = { 2, 6, 20, 50, 100, 200 };
+static const uint64_t history_resend_safe_ms[] = { 20, 50, 100, 200 };
+static volatile bool input_redundancy = true;
+
+CHIAKI_EXPORT void chiaki_feedback_sender_set_input_redundancy(bool enabled)
+{
+	input_redundancy = enabled;
+}
+
+static const uint64_t *history_resend_offsets(size_t *count)
+{
+	if(input_redundancy)
+	{
+		*count = sizeof(history_resend_fast_ms) / sizeof(history_resend_fast_ms[0]);
+		return history_resend_fast_ms;
+	}
+	*count = sizeof(history_resend_safe_ms) / sizeof(history_resend_safe_ms[0]);
+	return history_resend_safe_ms;
+}
+
+/** Sends the newest history packet again where one is due, returns ms until the next one or UINT64_MAX */
+static uint64_t feedback_sender_resend_history(ChiakiFeedbackSender *feedback_sender)
+{
+	if(!feedback_sender->last_history_size)
+		return UINT64_MAX;
+	size_t count;
+	const uint64_t *offsets = history_resend_offsets(&count);
+	uint64_t now = chiaki_time_now_monotonic_ms();
+	while(feedback_sender->last_history_resends < count
+		&& now >= feedback_sender->last_history_sent_ms + offsets[feedback_sender->last_history_resends])
+	{
+		chiaki_takion_send_feedback_history(feedback_sender->takion, feedback_sender->last_history_seq,
+			feedback_sender->last_history_buf, feedback_sender->last_history_size);
+		feedback_sender->last_history_resends++;
+	}
+	if(feedback_sender->last_history_resends >= count)
+		return UINT64_MAX;
+	uint64_t due = feedback_sender->last_history_sent_ms + offsets[feedback_sender->last_history_resends];
+	return due > now ? due - now : 0;
 }
 
 #define FEEDBACK_HISTORY_BUFFER_SIZE 0x10
@@ -31,6 +80,8 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_feedback_sender_init(ChiakiFeedbackSender *
 	feedback_sender->state_seq_num = 0;
 
 	feedback_sender->history_seq_num = 0;
+	feedback_sender->last_history_size = 0;
+	feedback_sender->last_history_resends = 0;
 	ChiakiErrorCode err = chiaki_feedback_history_buffer_init(&feedback_sender->history_buf, FEEDBACK_HISTORY_BUFFER_SIZE);
 	if(err != CHIAKI_ERR_SUCCESS)
 		return err;
@@ -168,7 +219,18 @@ static void feedback_sender_send_history_packet(ChiakiFeedbackSender *feedback_s
 
 	//CHIAKI_LOGD(feedback_sender->log, "Feedback History:");
 	//chiaki_log_hexdump(feedback_sender->log, CHIAKI_LOG_DEBUG, buf, buf_size);
-	chiaki_takion_send_feedback_history(feedback_sender->takion, feedback_sender->history_seq_num++, buf, buf_size);
+	ChiakiSeqNum16 seq_num = feedback_sender->history_seq_num++;
+	chiaki_takion_send_feedback_history(feedback_sender->takion, seq_num, buf, buf_size);
+
+	// TS5: keep it for the redundant copies, which replace those of the previous packet
+	if(buf_size <= sizeof(feedback_sender->last_history_buf))
+	{
+		memcpy(feedback_sender->last_history_buf, buf, buf_size);
+		feedback_sender->last_history_size = buf_size;
+		feedback_sender->last_history_seq = seq_num;
+		feedback_sender->last_history_sent_ms = chiaki_time_now_monotonic_ms();
+		feedback_sender->last_history_resends = 0;
+	}
 }
 
 static void feedback_sender_send_history(ChiakiFeedbackSender *feedback_sender)
@@ -268,6 +330,10 @@ static void *feedback_sender_thread_func(void *user)
 	while(true)
 	{
 		next_timeout = feedback_state_keepalive_ms;
+		// TS5: wake up in time for the next redundant copy of the newest input
+		uint64_t resend_in = feedback_sender_resend_history(feedback_sender);
+		if(resend_in < next_timeout)
+			next_timeout = resend_in;
 		err = chiaki_cond_timedwait_pred(&feedback_sender->state_cond, &feedback_sender->state_mutex, next_timeout, state_cond_check, feedback_sender);
 		if(err != CHIAKI_ERR_SUCCESS && err != CHIAKI_ERR_TIMEOUT)
 			break;
