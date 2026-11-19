@@ -19,6 +19,12 @@
         app:showAsAction="ifRoom" />
 
     <item
+        android:id="@+id/action_setup_check"
+        android:icon="@drawable/ic_fps"
+        android:title="@string/setup_check_title"
+        app:showAsAction="ifRoom" />
+
+    <item
         android:id="@+id/action_settings"
         android:icon="@drawable/ic_settings"
         android:title="@string/action_settings"

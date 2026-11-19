@@ -10,6 +10,8 @@
     <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
     <!-- Low latency Wi-Fi while streaming -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- TS5 setup check: Wi-Fi band, signal and link speed -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
     <!-- Also for TV boxes, played with a controller -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -57,6 +59,11 @@
                 android:resource="@xml/filepaths"
                 />
         </provider>
+
+        <activity
+            android:name=".main.SetupCheckActivity"
+            android:exported="false"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />
 
         <activity android:name=".main.MainActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize"

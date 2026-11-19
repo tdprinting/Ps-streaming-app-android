@@ -93,6 +93,17 @@ class MainActivity : AppCompatActivity()
 		setSupportActionBar(binding.toolbar)
 
 		binding.floatingActionButton.setOnClickListener { showAddConsoleSheet() }
+
+		// TS5: the first time, show the setup check, which finds what would add delay
+		if(savedInstanceState == null)
+		{
+			val prefs = Preferences(this)
+			if(!prefs.setupCheckShown)
+			{
+				prefs.setupCheckShown = true
+				startActivity(Intent(this, SetupCheckActivity::class.java))
+			}
+		}
 		binding.emptyDiscoverButton.setOnClickListener { viewModel.discoveryManager.active = true }
 		binding.emptyInternetPlayButton.setOnClickListener { startActivity(SettingsActivity.internetPlayIntent(this)) }
 		binding.emptyHelpButton.setOnClickListener { ConnectionHelp.showConsoleNotFound(this) }
@@ -335,6 +346,12 @@ class MainActivity : AppCompatActivity()
 		R.id.action_discover ->
 		{
 			viewModel.discoveryManager.active = !(viewModel.discoveryActive.value ?: false)
+			true
+		}
+
+		R.id.action_setup_check ->
+		{
+			startActivity(Intent(this, SetupCheckActivity::class.java))
 			true
 		}
 

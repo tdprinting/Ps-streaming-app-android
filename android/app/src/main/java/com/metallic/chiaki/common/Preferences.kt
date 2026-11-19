@@ -199,6 +199,11 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getBoolean(controllerOnlyKey, false)
 		set(value) { sharedPreferences.edit().putBoolean(controllerOnlyKey, value).apply() }
 
+	/** TS5: whether the setup check has opened by itself once, on the first launch */
+	var setupCheckShown
+		get() = sharedPreferences.getBoolean("setup_check_shown", false)
+		set(value) { sharedPreferences.edit().putBoolean("setup_check_shown", value).apply() }
+
 	/** TS5: send every input event again 2 and 6 ms later, so a packet lost on Wi-Fi costs ~2 ms */
 	val inputRedundancyKey get() = "latency_input_redundancy"
 	var inputRedundancy
