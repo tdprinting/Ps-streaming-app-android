@@ -481,6 +481,9 @@
     <string name="setup_check_title">Setup check</string>
     <string name="setup_check_apply">Apply best settings</string>
     <string name="setup_check_recheck">Check again</string>
+    <string name="setup_check_share">Share diagnostics</string>
+    <string name="setup_check_share_copied">Diagnostics copied</string>
+    <string name="setup_check_share_hint">After a stream, Share diagnostics sends (and copies) this check, your settings, what the last stream ran with and the app\'s log, so problems can be tracked down. Accounts and keys are left out.</string>
     <string name="setup_check_applied">Best settings applied: Max quality, H265, lowest latency pacing and every latency option</string>
     <string name="setup_check_summary_good">Everything looks ready for the lowest delay.</string>
     <string name="setup_check_summary_warn">%1$d things could lower your delay or improve the picture.</string>

@@ -204,6 +204,11 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getString("last_stream_report", null)
 		set(value) { sharedPreferences.edit().putString("last_stream_report", value).apply() }
 
+	/** TS5: what the last stream ran with (video path, statistics), for Share diagnostics */
+	var lastStreamDiagnostics: String?
+		get() = sharedPreferences.getString("last_stream_diagnostics", null)
+		set(value) { sharedPreferences.edit().putString("last_stream_diagnostics", value).apply() }
+
 	/** TS5: whether the setup check has opened by itself once, on the first launch */
 	var setupCheckShown
 		get() = sharedPreferences.getBoolean("setup_check_shown", false)

@@ -665,6 +665,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		if(reportShown)
 			return
 		reportShown = true
+		saveDiagnostics()
 		val r = viewModel.session.report() ?: return
 		val minutes = (android.os.SystemClock.elapsedRealtime() - streamStartMs) / 60000f
 		if(minutes < 0.5f || r.framesShown < 300)
@@ -691,6 +692,37 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		val text = lines.joinToString("\n")
 		Preferences(this).lastStreamReport = text
 		android.widget.Toast.makeText(applicationContext, text, android.widget.Toast.LENGTH_LONG).show()
+	}
+
+	/**
+	 * TS5: what this stream ran with, for Share diagnostics in the setup check: the statistics
+	 * overlay's lines (built now, shown or not) and the video path actually taken.
+	 */
+	private fun saveDiagnostics()
+	{
+		try
+		{
+			updateStats()
+			val path = when
+			{
+				frontBufferVideo != null -> "tearing mode (front buffer)"
+				videoRenderer?.hdrActive == true -> "shaders, HDR 10-bit"
+				videoRenderer != null -> "shaders"
+				hdrShadersFailed -> "plain SurfaceView (HDR shaders fell back)"
+				else -> "plain SurfaceView"
+			}
+			val minutes = (SystemClock.elapsedRealtime() - streamStartMs) / 60000f
+			val lines = mutableListOf(
+				String.format(Locale.ROOT, "Stream: %.1f min, %s", minutes, viewModel.session.connectInfo.host),
+				"Video path: $path",
+				"Direct input: " + (if(rootInput != null) "on" else "off"))
+			lines.addAll(binding.statsTextView.text.split("\n"))
+			Preferences(this).lastStreamDiagnostics = lines.joinToString("\n")
+		}
+		catch(e: Exception)
+		{
+			Log.w("StreamActivity", "Diagnostics not saved: $e")
+		}
 	}
 
 	override fun onPause()

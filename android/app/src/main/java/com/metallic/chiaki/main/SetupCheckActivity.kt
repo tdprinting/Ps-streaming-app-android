@@ -45,6 +45,7 @@ class SetupCheckActivity: AppCompatActivity()
 		binding.rootLayout.fitSystemBars()
 		binding.backButton.setOnClickListener { finish() }
 		binding.recheckButton.setOnClickListener { runChecks() }
+		binding.shareDiagnosticsButton.setOnClickListener { shareDiagnostics() }
 		binding.applyButton.setOnClickListener {
 			applyBestSettings(Preferences(this))
 			Toast.makeText(this, R.string.setup_check_applied, Toast.LENGTH_LONG).show()
@@ -59,6 +60,8 @@ class SetupCheckActivity: AppCompatActivity()
 		super.onResume()
 		runChecks()
 	}
+
+	private var lastChecks: List<Check> = emptyList()
 
 	private fun runChecks()
 	{
@@ -75,6 +78,7 @@ class SetupCheckActivity: AppCompatActivity()
 			rootCheck(),
 			lastStreamCheck()
 		)
+		lastChecks = checks
 		val layout = binding.checksLayout
 		layout.removeAllViews()
 		val inflater = LayoutInflater.from(this)
@@ -304,6 +308,107 @@ class SetupCheckActivity: AppCompatActivity()
 		val lines = report.lines()
 		val status = if(lines.lastOrNull()?.startsWith("Tip") == true) Status.WARN else Status.GOOD
 		return Check(status, lines.first(), lines.drop(1).joinToString("\n"))
+	}
+
+	// ── Share diagnostics ────────────────────────────────────────────────────────────────────
+
+	/**
+	 * Everything needed to tell what the app did on this device: the device, these checks, the
+	 * settings (without accounts or keys), the last stream's video path and statistics, and this
+	 * app's recent log. Shared as text, and copied, so it can be pasted anywhere.
+	 */
+	private fun shareDiagnostics()
+	{
+		binding.shareDiagnosticsButton.isEnabled = false
+		val checks = lastChecks
+		Thread {
+			val text = try { buildDiagnostics(checks) } catch(e: Exception) { "Diagnostics failed: $e" }
+			runOnUiThread {
+				binding.shareDiagnosticsButton.isEnabled = true
+				if(isFinishing)
+					return@runOnUiThread
+				val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+				clipboard.setPrimaryClip(android.content.ClipData.newPlainText("TS5 diagnostics", text))
+				val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+					type = "text/plain"
+					putExtra(android.content.Intent.EXTRA_SUBJECT, "TS5 Streaming diagnostics")
+					putExtra(android.content.Intent.EXTRA_TEXT, text)
+				}
+				try
+				{
+					startActivity(android.content.Intent.createChooser(send, getString(R.string.setup_check_share)))
+				}
+				catch(e: android.content.ActivityNotFoundException)
+				{
+					android.widget.Toast.makeText(this, R.string.setup_check_share_copied, android.widget.Toast.LENGTH_LONG).show()
+				}
+			}
+		}.start()
+	}
+
+	private fun buildDiagnostics(checks: List<Check>): String
+	{
+		val out = StringBuilder()
+		fun section(title: String) = out.append("\n== ").append(title).append(" ==\n")
+		out.append("TS5 Streaming diagnostics\n")
+		val version = try { packageManager.getPackageInfo(packageName, 0).versionName } catch(e: Exception) { "?" }
+		out.append("App ").append(version).append(" · ").append(java.util.Date()).append("\n")
+		out.append("Device ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL)
+			.append(" (").append(Build.DEVICE).append(") · Android ").append(Build.VERSION.RELEASE)
+			.append(" (API ").append(Build.VERSION.SDK_INT).append(")")
+		if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+			out.append(" · SoC ").append(Build.SOC_MANUFACTURER).append(' ').append(Build.SOC_MODEL)
+		out.append("\n")
+
+		section("Setup check")
+		for(c in checks)
+			out.append("[").append(c.status.name).append("] ").append(c.title).append(": ").append(c.detail.replace('\n', ' ')).append("\n")
+
+		section("Displays")
+		currentDisplay()?.let { d ->
+			out.append("Mode ").append(d.mode.physicalWidth).append('x').append(d.mode.physicalHeight)
+				.append(" @ ").append(d.mode.refreshRate).append(" Hz; modes: ")
+				.append(d.supportedModes.joinToString { "${it.physicalWidth}x${it.physicalHeight}@${"%.0f".format(it.refreshRate)}" })
+				.append("\n")
+			if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.N)
+				out.append("HDR types: ").append(d.hdrCapabilities?.supportedHdrTypes?.joinToString() ?: "none").append("\n")
+		}
+
+		section("Settings")
+		val hidden = Regex("(?i)token|psn|account|secret|auth|password|regist|duid|morning|key_|_key\\b")
+		val all = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this).all
+		for((k, v) in all.toSortedMap())
+		{
+			if(hidden.containsMatchIn(k) || k.startsWith("last_stream"))
+				continue
+			val value = v.toString()
+			if(value.length > 120)
+				continue
+			out.append(k).append(" = ").append(value).append("\n")
+		}
+		getSharedPreferences("touch_layout", Context.MODE_PRIVATE).all.forEach { (k, v) ->
+			out.append("touch_layout.").append(k).append(" = ").append(v.toString().take(400)).append("\n")
+		}
+
+		val prefs = Preferences(this)
+		section("Last stream")
+		out.append(prefs.lastStreamDiagnostics ?: "No stream yet").append("\n")
+		prefs.lastStreamReport?.let { out.append("\n").append(it).append("\n") }
+
+		section("Log (this app, newest last)")
+		try
+		{
+			val process = ProcessBuilder("logcat", "-d", "-v", "time", "-t", "600",
+				"--pid=" + android.os.Process.myPid()).redirectErrorStream(true).start()
+			val log = process.inputStream.bufferedReader().readText()
+			process.waitFor()
+			out.append(log.ifBlank { "(empty: the log is cleared when the app restarts)\n" })
+		}
+		catch(e: Exception)
+		{
+			out.append("Log unavailable: ").append(e).append("\n")
+		}
+		return out.toString()
 	}
 
 	private fun applyBestSettings(p: Preferences)
