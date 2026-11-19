@@ -29,7 +29,11 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;26.1.10909125" "cmake;3.22.1"
 
-      - uses: gradle/actions/setup-gradle@v4
+      # Our own wrapper JAR is a known Gradle release; the oboe submodule carries an unknown one
+      # in a sample app we never build, so the wrapper check is limited to ours
+      - uses: gradle/actions/wrapper-validation@v4
+        with:
+          allow-checksums: e2b82129ab64751fd40437007bd2f7f2afb3c6e41a9198e628650b22d5824a14
 
       - name: Build debug APK (fdroid flavor, arm64 is what the Odin 2 Portal needs)
         working-directory: android
