@@ -25,11 +25,14 @@ static void *android_chiaki_video_decoder_output_thread_func(void *user);
 // a session starts, read when a decoder is created.
 static volatile bool latency_skip_stale_frames = true;
 static volatile bool latency_snapdragon_tuning = true;
+static volatile bool latency_snapdragon_early_output = true;
 
 void android_chiaki_video_decoder_set_latency_options(bool skip_stale_frames,
-                                                      bool snapdragon_tuning) {
+                                                      bool snapdragon_tuning,
+                                                      bool snapdragon_early_output) {
   latency_skip_stale_frames = skip_stale_frames;
   latency_snapdragon_tuning = snapdragon_tuning;
+  latency_snapdragon_early_output = snapdragon_early_output;
 }
 
 /** Decoder tiers, from most to least aggressive */
@@ -125,6 +128,12 @@ static AMediaFormat *create_format(AndroidChiakiVideoDecoder *decoder,
     // picks for a 60 fps stream, so every frame is decoded as fast as the
     // hardware can (KEY_OPERATING_RATE, as Moonlight does on Qualcomm)
     AMediaFormat_setInt32(format, "operating-rate", 0x7fff);
+    if (latency_snapdragon_early_output)
+      // Hand each decoded frame on with a software fence that signals when it is
+      // fully written, instead of waiting for that before releasing it. Only the
+      // 8 Gen 2's key: the newer vendor.qti-ext-output-fence keys caused picture
+      // glitches with HEVC in another client.
+      AMediaFormat_setInt32(format, "vendor.qti-ext-output-sw-fence-enable.value", 1);
   }
 
   // Big enough for a whole keyframe, so a frame is never split across

@@ -95,7 +95,10 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		}
 
 		// Hayai: read by the native video decoder when it is created for this stream
-		Preferences(this).let { LatencyOptions.apply(it.skipStaleFrames, it.snapdragonTuning) }
+		Preferences(this).let {
+			LatencyOptions.apply(it.skipStaleFrames, it.snapdragonTuning, it.snapdragonEarlyOutput,
+				it.lowLatencyAudio, it.bigCores)
+		}
 
 		viewModel = ViewModelProvider(this, viewModelFactory {
 			StreamViewModel(application, connectInfo)
@@ -253,6 +256,9 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 	/** Draws the video through shaders, when debanding or super resolution is on */
 	private var videoRenderer: VideoRenderer? = null
 
+	/** Hayai: tearing mode, see [FrontBufferVideo] */
+	private var frontBufferVideo: FrontBufferVideo? = null
+
 	/**
 	 * Hayai: the display's modes at the current resolution with the highest refresh rate, e.g. the
 	 * Odin 2 Portal's 120 Hz mode. Null when there is no faster mode than the current one to pick.
@@ -349,8 +355,20 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		val prefs = Preferences(this)
 		viewModel.session.detachSurface()
 		val upscale = prefs.upscalingEnabled && VideoRenderer.isUpscalingSupported(this)
+		frontBufferVideo?.release()
+		frontBufferVideo = null
 
-		if (prefs.debandingEnabled || upscale) {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && prefs.frontBuffer
+			&& !prefs.debandingEnabled && !upscale && FrontBufferVideo.isSupported()) {
+			// Hayai tearing mode: the decoder writes into a texture that is drawn straight into the
+			// front buffer the display is scanning out, layered on the plain SurfaceView
+			binding.surfaceView.visibility = View.VISIBLE
+			binding.debandSurfaceView.visibility = View.GONE
+			val videoProfile = viewModel.session.connectInfo.videoProfile
+			frontBufferVideo = FrontBufferVideo(binding.surfaceView, videoProfile.width, videoProfile.height) { surface ->
+				viewModel.session.attachToSurface(surface)
+			}
+		} else if (prefs.debandingEnabled || upscale) {
 			// Use GLSurfaceView to draw the video through shaders
 			binding.surfaceView.visibility = View.GONE
 			binding.debandSurfaceView.visibility = View.VISIBLE
@@ -726,6 +744,13 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			format(R.string.stream_stats_timing, stats.frameGapMsMax, stats.audioBufferMs),
 			format(R.string.stream_stats_latency, decoderTierText(stats.decoderLatencyTier),
 				stats.framesSkippedStale, currentRefreshRate()),
+			format(R.string.stream_stats_audio,
+				getString(if(stats.audioExclusive) R.string.stream_stats_audio_exclusive else R.string.stream_stats_audio_shared),
+				stats.audioDeviceBufferMs),
+			frontBufferVideo?.let {
+				format(R.string.stream_stats_front_buffer, getString(
+					if(it.frontBufferSupported) R.string.stream_stats_front_buffer_on else R.string.stream_stats_front_buffer_unsupported))
+			},
 			thermalStatus()?.let { format(R.string.stream_stats_thermal, thermalStatusText(it)) }
 		).joinToString("\n")
 	}
@@ -844,6 +869,8 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		super.onDestroy()
 		rumble?.stop()
 		videoRenderer?.release()
+		frontBufferVideo?.release()
+		frontBufferVideo = null
 		controlsDisposable.dispose()
 	}
 

@@ -44,6 +44,13 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_thread_set_name(ChiakiThread *thread, const
  */
 CHIAKI_EXPORT ChiakiErrorCode chiaki_thread_set_current_nice(int nice);
 
+/**
+ * Hayai: when enabled, threads that raise their priority with chiaki_thread_set_current_nice()
+ * are also kept off the slowest CPU cluster (on Android only). Little cores (Cortex-A510 on the
+ * Snapdragon 8 Gen 2) take longer to wake and run the network, decoder and audio work slower.
+ */
+CHIAKI_EXPORT void chiaki_thread_set_prefer_big_cores(bool enabled);
+
 
 typedef struct chiaki_mutex_t
 {

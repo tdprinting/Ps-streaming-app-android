@@ -177,6 +177,34 @@ static ChiakiErrorCode takion_recv_message_cookie_ack(ChiakiTakion *takion);
 static void takion_handle_packet_av(ChiakiTakion *takion, uint8_t base_type, uint8_t *buf, size_t buf_size);
 static ChiakiErrorCode takion_read_extra_sock_messages(ChiakiTakion *takion);
 
+#if defined(__ANDROID__)
+#include <netinet/in.h>
+/**
+ * Hayai: marks the stream's packets DSCP EF (expedited forwarding, 46), the class for real-time
+ * traffic. Linux's Wi-Fi stack maps it to a WMM priority above best effort, so the controller
+ * input this device sends wins airtime over other traffic on a busy channel, and routers that
+ * honor DSCP queue it first. Failure is harmless: the packets simply go unmarked.
+ */
+static void takion_set_qos(ChiakiTakion *takion, int family)
+{
+	const int tos = 46 << 2; // EF
+	int r;
+	if(family == AF_INET6)
+		r = setsockopt(takion->sock, IPPROTO_IPV6, IPV6_TCLASS, &tos, sizeof(tos));
+	else
+		r = setsockopt(takion->sock, IPPROTO_IP, IP_TOS, &tos, sizeof(tos));
+	if(r < 0)
+		CHIAKI_LOGW(takion->log, "Takion failed to mark packets for QoS: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
+	else
+		CHIAKI_LOGI(takion->log, "Takion marked packets DSCP EF for Wi-Fi priority");
+}
+#else
+static void takion_set_qos(ChiakiTakion *takion, int family)
+{
+	(void)takion;
+	(void)family;
+}
+#endif
 CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, ChiakiTakionConnectInfo *info, chiaki_socket_t *sock)
 {
 	ChiakiErrorCode ret = CHIAKI_ERR_SUCCESS;
@@ -410,6 +438,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 #endif
 		}
 
+		takion_set_qos(takion, info->sa->sa_family);
 		r = connect(takion->sock, info->sa, info->sa_len);
 		if(r < 0)
 		{

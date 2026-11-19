@@ -194,6 +194,31 @@
             app:icon="@drawable/ic_codec" />
 
         <SwitchPreference
+            app:key="latency_snapdragon_early_output"
+            app:title="@string/preferences_snapdragon_early_output_title"
+            app:summary="@string/preferences_snapdragon_early_output_summary"
+            app:dependency="latency_snapdragon_tuning"
+            app:icon="@drawable/ic_codec" />
+
+        <SwitchPreference
+            app:key="latency_low_latency_audio"
+            app:title="@string/preferences_low_latency_audio_title"
+            app:summary="@string/preferences_low_latency_audio_summary"
+            app:icon="@drawable/ic_fps" />
+
+        <SwitchPreference
+            app:key="latency_big_cores"
+            app:title="@string/preferences_big_cores_title"
+            app:summary="@string/preferences_big_cores_summary"
+            app:icon="@drawable/ic_fps" />
+
+        <SwitchPreference
+            app:key="latency_front_buffer"
+            app:title="@string/preferences_front_buffer_title"
+            app:summary="@string/preferences_front_buffer_summary"
+            app:icon="@drawable/ic_display_normal" />
+
+        <SwitchPreference
             app:key="latency_sustained_performance"
             app:title="@string/preferences_sustained_performance_title"
             app:summary="@string/preferences_sustained_performance_summary"

@@ -66,9 +66,14 @@ typedef struct android_chiaki_video_decoder_t {
  *   all behind each other on the display.
  * snapdragon_tuning: try Qualcomm's dedicated low latency decoder instance and
  *   its vendor keys first.
+ * snapdragon_early_output: with snapdragon_tuning, also ask the decoder to hand
+ *   each frame on with a software fence instead of after it is fully written
+ *   (vendor.qti-ext-output-sw-fence-enable), which Artemis found to be the
+ *   biggest single decode latency win on the Snapdragon 8 Gen 2.
  */
 void android_chiaki_video_decoder_set_latency_options(bool skip_stale_frames,
-                                                      bool snapdragon_tuning);
+                                                      bool snapdragon_tuning,
+                                                      bool snapdragon_early_output);
 
 ChiakiErrorCode
 android_chiaki_video_decoder_init(AndroidChiakiVideoDecoder *decoder,

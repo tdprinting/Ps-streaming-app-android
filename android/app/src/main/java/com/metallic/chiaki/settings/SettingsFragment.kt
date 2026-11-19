@@ -54,6 +54,10 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 		preferences.skipStaleFramesKey -> preferences.skipStaleFrames
 		preferences.snapdragonTuningKey -> preferences.snapdragonTuning
 		preferences.sustainedPerformanceKey -> preferences.sustainedPerformance
+		preferences.snapdragonEarlyOutputKey -> preferences.snapdragonEarlyOutput
+		preferences.lowLatencyAudioKey -> preferences.lowLatencyAudio
+		preferences.bigCoresKey -> preferences.bigCores
+		preferences.frontBufferKey -> preferences.frontBuffer
 		else -> defValue
 	}
 
@@ -76,6 +80,10 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 			preferences.skipStaleFramesKey -> preferences.skipStaleFrames = value
 			preferences.snapdragonTuningKey -> preferences.snapdragonTuning = value
 			preferences.sustainedPerformanceKey -> preferences.sustainedPerformance = value
+			preferences.snapdragonEarlyOutputKey -> preferences.snapdragonEarlyOutput = value
+			preferences.lowLatencyAudioKey -> preferences.lowLatencyAudio = value
+			preferences.bigCoresKey -> preferences.bigCores = value
+			preferences.frontBufferKey -> preferences.frontBuffer = value
 		}
 	}
 

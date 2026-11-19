@@ -435,6 +435,20 @@
     <string name="preferences_snapdragon_tuning_summary">Qualcomm\'s dedicated low latency decoder at its top clock. Turn off if the picture glitches.</string>
     <string name="preferences_sustained_performance_title">Sustained performance mode</string>
     <string name="preferences_sustained_performance_summary">Holds clocks below their peak to avoid throttling on phones without a fan. Off is faster on the Odin.</string>
+    <string name="preferences_snapdragon_early_output_title">Snapdragon early frame output</string>
+    <string name="preferences_snapdragon_early_output_summary">The decoder hands each frame on before it finishes writing it, with a fence the display waits on. Turn off if you see lines or flicker.</string>
+    <string name="preferences_low_latency_audio_title">Low latency audio</string>
+    <string name="preferences_low_latency_audio_summary">Sound goes straight to the speaker or headphones, bypassing Android\'s mixer, with the smallest buffer that doesn\'t crackle</string>
+    <string name="preferences_big_cores_title">Fast CPU cores only</string>
+    <string name="preferences_big_cores_summary">Keeps the network, video and audio threads off the slow power-saving cores</string>
+    <string name="preferences_front_buffer_title">Tearing mode (experimental)</string>
+    <string name="preferences_front_buffer_summary">Draws each frame straight to the screen without waiting for the next refresh. Lowest possible display delay, but you may see a tear line. Needs Android 13 and a display that supports front buffer rendering, otherwise it has no effect.</string>
+    <string name="stream_stats_audio" translatable="false">Audio: %1$s · device buffer %2$.1f ms</string>
+    <string name="stream_stats_audio_exclusive">exclusive (bypasses mixer)</string>
+    <string name="stream_stats_audio_shared">shared</string>
+    <string name="stream_stats_front_buffer" translatable="false">Tearing mode: %1$s</string>
+    <string name="stream_stats_front_buffer_on">on, drawing straight to the screen</string>
+    <string name="stream_stats_front_buffer_unsupported">not supported by this display, using the normal path</string>
     <string name="stream_stats_latency" translatable="false">Decoder: %1$s · %2$d stale frames skipped · display %3$.0f Hz</string>
     <string name="stream_stats_decoder_snapdragon">Snapdragon low latency</string>
     <string name="stream_stats_decoder_low_latency">low latency</string>

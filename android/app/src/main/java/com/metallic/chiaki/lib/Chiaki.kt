@@ -103,7 +103,8 @@ private class ChiakiNative
 		@JvmStatic external fun sessionSetLoginPin(ptr: Long, pin: String)
 		@JvmStatic external fun sessionGotoBed(ptr: Long): Int
 		@JvmStatic external fun sessionGetStats(ptr: Long, stats: FloatArray)
-		@JvmStatic external fun setLatencyOptions(skipStaleFrames: Boolean, snapdragonTuning: Boolean)
+		@JvmStatic external fun setLatencyOptions(skipStaleFrames: Boolean, snapdragonTuning: Boolean,
+			snapdragonEarlyOutput: Boolean, lowLatencyAudio: Boolean, bigCores: Boolean)
 		@JvmStatic external fun sessionLogInfo(ptr: Long, text: String)
 		@JvmStatic external fun holepunchListDevices(result: CreateResult, token: String, ps5: Boolean): Array<HolepunchDevice>?
 		@JvmStatic external fun holepunchCreate(token: String, logFile: String?, logVerbose: Boolean): Long
@@ -495,14 +496,19 @@ data class StreamStats(
 	/** Hayai: decoded frames skipped because a newer one was ready, since the session started */
 	val framesSkippedStale: Long = 0,
 	/** Hayai: 0 plain, 1 low latency, 2 Snapdragon low latency decoder */
-	val decoderLatencyTier: Int = 0
+	val decoderLatencyTier: Int = 0,
+	/** Hayai: the audio device's own buffer, in ms */
+	val audioDeviceBufferMs: Float = 0f,
+	/** Hayai: whether the audio stream skips Android's mixer (AAudio exclusive / MMAP) */
+	val audioExclusive: Boolean = false
 )
 
 /** Hayai: latency options that apply to sessions created from now on */
 object LatencyOptions
 {
-	fun apply(skipStaleFrames: Boolean, snapdragonTuning: Boolean) =
-		ChiakiNative.setLatencyOptions(skipStaleFrames, snapdragonTuning)
+	fun apply(skipStaleFrames: Boolean, snapdragonTuning: Boolean, snapdragonEarlyOutput: Boolean,
+		lowLatencyAudio: Boolean, bigCores: Boolean) =
+		ChiakiNative.setLatencyOptions(skipStaleFrames, snapdragonTuning, snapdragonEarlyOutput, lowLatencyAudio, bigCores)
 }
 
 /**
@@ -636,10 +642,10 @@ class Session(connectInfo: ConnectInfo, logFile: String?, logVerbose: Boolean,
 
 	fun getStats(): StreamStats?
 	{
-		val stats = FloatArray(10)
+		val stats = FloatArray(12)
 		withNative { ChiakiNative.sessionGetStats(it, stats) } ?: return null
 		return StreamStats(stats[0], stats[1], stats[2], stats[3].toLong(), stats[4], stats[5], stats[6], stats[7],
-			stats[8].toLong(), stats[9].toInt())
+			stats[8].toLong(), stats[9].toInt(), stats[10], stats[11] != 0f)
 	}
 
 	/**

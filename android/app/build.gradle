@@ -150,6 +150,8 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.browser:browser:1.8.0'
     implementation 'androidx.core:core-ktx:1.12.0'
+    // Hayai: front buffer (tearing mode) rendering
+    implementation 'androidx.graphics:graphics-core:1.0.3'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
     implementation 'androidx.preference:preference-ktx:1.2.1'

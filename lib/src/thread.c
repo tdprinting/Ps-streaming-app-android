@@ -101,9 +101,71 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_thread_set_name(ChiakiThread *thread, const
 	return CHIAKI_ERR_SUCCESS;
 }
 
+#ifdef __ANDROID__
+#include <sched.h>
+#include <unistd.h>
+
+static volatile bool prefer_big_cores = true;
+
+CHIAKI_EXPORT void chiaki_thread_set_prefer_big_cores(bool enabled)
+{
+	prefer_big_cores = enabled;
+}
+
+/** The highest frequency a CPU can run at, in kHz, or 0 if unknown */
+static long cpu_max_freq_khz(int cpu)
+{
+	char path[96];
+	snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu%d/cpufreq/cpuinfo_max_freq", cpu);
+	FILE *f = fopen(path, "r");
+	if(!f)
+		return 0;
+	long khz = 0;
+	if(fscanf(f, "%ld", &khz) != 1)
+		khz = 0;
+	fclose(f);
+	return khz;
+}
+
+/** Moves the calling thread onto every CPU that isn't in the slowest cluster */
+static void pin_current_thread_to_big_cores(void)
+{
+	long cpus = sysconf(_SC_NPROCESSORS_CONF);
+	if(cpus <= 1 || cpus > CPU_SETSIZE)
+		return;
+	long freq[CPU_SETSIZE];
+	long lowest = 0, highest = 0;
+	for(int i = 0; i < cpus; i++)
+	{
+		freq[i] = cpu_max_freq_khz(i);
+		if(freq[i] <= 0)
+			return; // offline or unreadable: leave it to the scheduler
+		if(!lowest || freq[i] < lowest)
+			lowest = freq[i];
+		if(freq[i] > highest)
+			highest = freq[i];
+	}
+	if(lowest == highest)
+		return; // all cores alike
+	cpu_set_t set;
+	CPU_ZERO(&set);
+	for(int i = 0; i < cpus; i++)
+		if(freq[i] > lowest)
+			CPU_SET(i, &set);
+	sched_setaffinity(0, sizeof(set), &set);
+}
+#else
+CHIAKI_EXPORT void chiaki_thread_set_prefer_big_cores(bool enabled)
+{
+	(void)enabled;
+}
+#endif
+
 CHIAKI_EXPORT ChiakiErrorCode chiaki_thread_set_current_nice(int nice)
 {
 #ifdef __ANDROID__
+	if(prefer_big_cores && nice < 0)
+		pin_current_thread_to_big_cores();
 	// On Linux, nice applies to the calling thread only
 	if(setpriority(PRIO_PROCESS, 0, nice) != 0)
 		return CHIAKI_ERR_UNKNOWN;

@@ -142,6 +142,33 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getBoolean(snapdragonTuningKey, true)
 		set(value) { sharedPreferences.edit().putBoolean(snapdragonTuningKey, value).apply() }
 
+	/** Hayai: Snapdragon decoder hands frames on with a software fence (vendor.qti-ext-output-sw-fence-enable) */
+	val snapdragonEarlyOutputKey get() = "latency_snapdragon_early_output"
+	var snapdragonEarlyOutput
+		get() = sharedPreferences.getBoolean(snapdragonEarlyOutputKey, true)
+		set(value) { sharedPreferences.edit().putBoolean(snapdragonEarlyOutputKey, value).apply() }
+
+	/** Hayai: exclusive (MMAP) audio with the smallest device buffer that doesn't crackle. Off on TVs, whose HDMI outputs drop exclusive streams. */
+	val lowLatencyAudioKey get() = "latency_low_latency_audio"
+	var lowLatencyAudio
+		get() = sharedPreferences.getBoolean(lowLatencyAudioKey, !isTv)
+		set(value) { sharedPreferences.edit().putBoolean(lowLatencyAudioKey, value).apply() }
+
+	/** Hayai: keep the network, decoder and audio threads off the little CPU cores */
+	val bigCoresKey get() = "latency_big_cores"
+	var bigCores
+		get() = sharedPreferences.getBoolean(bigCoresKey, true)
+		set(value) { sharedPreferences.edit().putBoolean(bigCoresKey, value).apply() }
+
+	/**
+	 * Hayai, experimental: draw each frame straight into the buffer the display is scanning out
+	 * (front buffer rendering), skipping the wait for the next refresh and the compositor. Tears.
+	 */
+	val frontBufferKey get() = "latency_front_buffer"
+	var frontBuffer
+		get() = sharedPreferences.getBoolean(frontBufferKey, false)
+		set(value) { sharedPreferences.edit().putBoolean(frontBufferKey, value).apply() }
+
 	/**
 	 * Hayai: Android's sustained performance mode holds clocks below their peak so a fanless phone
 	 * doesn't throttle. The Odin's fan keeps it cool, so there it is off by default for full clocks.

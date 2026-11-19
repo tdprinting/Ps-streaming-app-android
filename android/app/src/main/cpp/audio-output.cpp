@@ -26,7 +26,22 @@
 #define CATCH_UP_WINDOW_MS 4000
 #define CATCH_UP_KEEP_MS 20
 #define CATCH_UP_SLACK_MS 20
+// Hayai low latency audio: a shorter window and less kept back, so sound that piles up behind
+// (Wi-Fi bursts) is trimmed faster and the steady state sits closer to the picture
+#define LL_CATCH_UP_WINDOW_MS 2000
+#define LL_CATCH_UP_KEEP_MS 10
+#define LL_CATCH_UP_SLACK_MS 10
+// Hayai low latency audio: the device buffer starts at two bursts ("double buffering", Android's
+// recommendation) and grows by a burst after each underrun, up to this many
+#define LL_MAX_BURSTS 6
 
+// Hayai: see android_chiaki_audio_output_set_low_latency()
+static std::atomic<bool> low_latency_audio{true};
+
+extern "C" void android_chiaki_audio_output_set_low_latency(bool enabled)
+{
+	low_latency_audio.store(enabled, std::memory_order_relaxed);
+}
 using AudioBuffer = CircularBuffer<BUFFER_CHUNKS_COUNT, BUFFER_CHUNK_SIZE>;
 
 class AudioOutput;
@@ -71,6 +86,16 @@ struct AudioOutput
 	// Skipped by the callback, logged from the decoder's thread, as the callback shouldn't write files
 	std::atomic<int32_t> skipped_ms{0};
 	std::atomic<int32_t> skipped_from_ms{0};
+	// Hayai: whether this stream runs the low latency setup, decided when it is opened
+	bool low_latency = false;
+	// Hayai: underruns seen so far, and frames played since they were last checked.
+	// Only the stream's callback uses these.
+	int32_t xruns_seen = 0;
+	int64_t frames_since_xrun_check = 0;
+	// Hayai: for the statistics, written when the stream opens or the buffer grows
+	std::atomic<int32_t> device_buffer_frames{0};
+	std::atomic<int32_t> device_rate{0};
+	std::atomic<bool> exclusive{false};
 
 	AudioOutput() : stream_callback(this) {}
 };
@@ -85,9 +110,15 @@ static void open_stream(AudioOutput *ao)
 	}
 
 	oboe::AudioStreamBuilder builder;
-	// Shared: exclusive streams are refused or dropped by some HDMI outputs, e.g. on TV boxes
+	// Shared: exclusive streams are refused or dropped by some HDMI outputs, e.g. on TV boxes.
+	// Hayai: exclusive in low latency mode, so the sound skips Android's mixer and goes straight
+	// into the buffer the DSP reads (AAudio MMAP), which saves several ms on the built-in speakers
+	// and wired headphones. Android opens a shared stream instead when it can't give exclusive.
+	ao->low_latency = low_latency_audio.load(std::memory_order_relaxed) && !ao->use_opensl;
+	ao->xruns_seen = 0;
+	ao->frames_since_xrun_check = 0;
 	builder.setPerformanceMode(oboe::PerformanceMode::LowLatency)
-		->setSharingMode(oboe::SharingMode::Shared)
+		->setSharingMode(ao->low_latency ? oboe::SharingMode::Exclusive : oboe::SharingMode::Shared)
 		->setUsage(oboe::Usage::Game)
 		->setFormat(oboe::AudioFormat::I16)
 		->setChannelCount(ao->channels)
@@ -106,6 +137,21 @@ static void open_stream(AudioOutput *ao)
 		CHIAKI_LOGE(ao->log, "Audio Output failed to open Oboe stream: %s", oboe::convertToText(result));
 		return;
 	}
+
+	if(ao->low_latency)
+	{
+		int32_t burst = ao->stream->getFramesPerBurst();
+		if(burst > 0)
+			ao->stream->setBufferSizeInFrames(burst * 2);
+	}
+	ao->device_buffer_frames.store(ao->stream->getBufferSizeInFrames(), std::memory_order_relaxed);
+	ao->device_rate.store(ao->stream->getSampleRate(), std::memory_order_relaxed);
+	ao->exclusive.store(ao->stream->getSharingMode() == oboe::SharingMode::Exclusive, std::memory_order_relaxed);
+	CHIAKI_LOGI(ao->log, "Audio Output: %s, %d Hz, burst %d frames, buffer %d frames, API %s",
+			ao->stream->getSharingMode() == oboe::SharingMode::Exclusive ? "exclusive" : "shared",
+			(int)ao->stream->getSampleRate(), (int)ao->stream->getFramesPerBurst(),
+			(int)ao->stream->getBufferSizeInFrames(),
+			ao->stream->getAudioApi() == oboe::AudioApi::AAudio ? "AAudio" : "OpenSL ES");
 
 	result = ao->stream->start();
 	if(result == oboe::Result::OK)
@@ -175,6 +221,50 @@ extern "C" int32_t android_chiaki_audio_output_buffered_ms(void *audio_output)
 	return ao->lowest_ms.load(std::memory_order_relaxed);
 }
 
+extern "C" int32_t android_chiaki_audio_output_device_buffer_us(void *audio_output)
+{
+	auto ao = reinterpret_cast<AudioOutput *>(audio_output);
+	int64_t rate = ao->device_rate.load(std::memory_order_relaxed);
+	if(rate <= 0)
+		return 0;
+	return (int32_t)(ao->device_buffer_frames.load(std::memory_order_relaxed) * 1000000LL / rate);
+}
+
+extern "C" bool android_chiaki_audio_output_exclusive(void *audio_output)
+{
+	auto ao = reinterpret_cast<AudioOutput *>(audio_output);
+	return ao->exclusive.load(std::memory_order_relaxed);
+}
+
+/**
+ * Hayai: grows the device buffer by a burst after an underrun, like Oboe's LatencyTuner, so it
+ * stays as small as this device allows without crackling. Runs in the stream's callback.
+ */
+static void tune_buffer(AudioOutput *ao, oboe::AudioStream *stream, int32_t num_frames)
+{
+	if(!ao->low_latency)
+		return;
+	ao->frames_since_xrun_check += num_frames;
+	// About every 100 ms
+	if(ao->frames_since_xrun_check * 10 < stream->getSampleRate())
+		return;
+	ao->frames_since_xrun_check = 0;
+	auto xruns = stream->getXRunCount();
+	if(!xruns)
+		return;
+	int32_t count = xruns.value();
+	if(count <= ao->xruns_seen)
+		return;
+	ao->xruns_seen = count;
+	int32_t burst = stream->getFramesPerBurst();
+	int32_t size = stream->getBufferSizeInFrames();
+	if(burst <= 0 || size >= burst * LL_MAX_BURSTS)
+		return;
+	auto r = stream->setBufferSizeInFrames(size + burst);
+	if(r)
+		ao->device_buffer_frames.store(r.value(), std::memory_order_relaxed);
+}
+
 // Called by the stream's callback after it took its audio
 static void catch_up(AudioOutput *ao, oboe::AudioStream *stream, int32_t num_frames)
 {
@@ -185,17 +275,19 @@ static void catch_up(AudioOutput *ao, oboe::AudioStream *stream, int32_t num_fra
 	int64_t queued = std::max<int64_t>(0, ao->queued.load(std::memory_order_relaxed));
 	ao->window_lowest = std::min(ao->window_lowest, queued);
 	ao->window_frames += num_frames;
-	if(ao->window_frames * 1000 < static_cast<int64_t>(stream->getSampleRate()) * CATCH_UP_WINDOW_MS)
+	const int64_t window_ms = ao->low_latency ? LL_CATCH_UP_WINDOW_MS : CATCH_UP_WINDOW_MS;
+	const int64_t keep_ms = ao->low_latency ? LL_CATCH_UP_KEEP_MS : CATCH_UP_KEEP_MS;
+	const int64_t slack_ms = ao->low_latency ? LL_CATCH_UP_SLACK_MS : CATCH_UP_SLACK_MS;
+	if(ao->window_frames * 1000 < static_cast<int64_t>(stream->getSampleRate()) * window_ms)
 		return;
 
 	int64_t lowest = ao->window_lowest;
 	ao->window_lowest = INT64_MAX;
 	ao->window_frames = 0;
 	ao->lowest_ms.store(static_cast<int32_t>(lowest / bytes_per_ms), std::memory_order_relaxed);
-	if(lowest <= bytes_per_ms * (CATCH_UP_KEEP_MS + CATCH_UP_SLACK_MS))
+	if(lowest <= bytes_per_ms * (keep_ms + slack_ms))
 		return;
-
-	int64_t skip = (lowest - bytes_per_ms * CATCH_UP_KEEP_MS) / bytes_per_frame * bytes_per_frame;
+	int64_t skip = (lowest - bytes_per_ms * keep_ms) / bytes_per_frame * bytes_per_frame;
 	uint8_t scratch[BUFFER_CHUNK_SIZE];
 	int64_t skipped = 0;
 	while(skipped < skip)
@@ -225,6 +317,7 @@ oboe::DataCallbackResult AudioOutputCallback::onAudioReady(oboe::AudioStream *st
 	size_t buf_size_delivered = audio_output->buf.Pop(buf, buf_size_requested);
 	audio_output->queued.fetch_sub(static_cast<int64_t>(buf_size_delivered), std::memory_order_relaxed);
 	catch_up(audio_output, stream, num_frames);
+	tune_buffer(audio_output, stream, num_frames);
 
 	if(buf_size_delivered < buf_size_requested)
 	{
