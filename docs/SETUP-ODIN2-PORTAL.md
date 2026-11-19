@@ -1,5 +1,7 @@
 # Setup for the lowest latency: Odin 2 Portal + PS5 + eero 6E
 
+**Quickest way:** open TS5 Streaming and tap the setup check button in the top bar (it also opens by itself the first time). It checks most of the points below, and **Apply best settings** sets up the app for you.
+
 ## Network (the biggest single factor after the app)
 
 1. **Wire the PS5 to the eero with Ethernet.** Then only one hop, eero → Odin, is wireless instead of two. PS5 Wi-Fi is Wi-Fi 6 only and shares airtime with everything else.

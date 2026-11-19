@@ -25,6 +25,7 @@ It is a fork of [Momiji](https://github.com/yazanj082/momiji), the most complete
 | Input | Android's input system | + experimental **direct kernel input** (root), input delay in stats |
 | Frame pacing | – | **Lowest latency / Balanced / Smoothest** presets |
 | Connection | – | **Unstable connection warning**, **keep Wi-Fi awake** |
+| Setup check | – | Checks Wi-Fi band and link, 120 Hz, HDR, Bluetooth audio, battery saver and heat, and applies the best settings in one tap |
 | Controller only | – | Use the device as a **wireless controller** for the console's TV |
 | Stats overlay | Network, decode, timing | + decoder mode, stale frames skipped, refresh rate, audio mode |
 

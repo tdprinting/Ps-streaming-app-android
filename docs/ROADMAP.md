@@ -35,6 +35,9 @@
 - [x] Network path: 4 MB socket buffer, burst reads, kernel drop counter, socket priority
 - [x] Audio decoder: shorter wait, lock fix
 
+## Done (v0.5)
+- [x] Setup check screen (network, Wi-Fi band and link, display, HDR, audio, power, heat, settings, root) with one-tap best settings
+
 ## Next
 - [ ] **Test on the Odin 2 Portal**: confirm `c2.qti.*.low_latency` starts (see the log / statistics) and that the display stays at 120 Hz
 - [ ] Measure end to end delay with a 240 fps phone camera (button LED or on-screen counter) against Momiji and Sony's app, and record the results in `docs/LATENCY.md`
