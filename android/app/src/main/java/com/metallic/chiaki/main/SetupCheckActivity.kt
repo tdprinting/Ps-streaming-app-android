@@ -66,7 +66,6 @@ class SetupCheckActivity: AppCompatActivity()
 			networkCheck(),
 			wifiBandCheck(),
 			wifiSignalCheck(),
-			wifiLowLatencyCheck(),
 			refreshCheck(),
 			hdrCheck(),
 			audioCheck(),
@@ -178,18 +177,6 @@ class SetupCheckActivity: AppCompatActivity()
 				"$speeds. Moving closer to the router or removing walls in between helps most.")
 			else -> Check(Status.BAD, "Weak Wi-Fi link", "$speeds. Expect lost packets and stutter: move closer to the router.")
 		}
-	}
-
-	private fun wifiLowLatencyCheck(): Check?
-	{
-		if(!onWifi() || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
-			return null
-		val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-		return if(wifi.isLowLatencyModeSupported)
-			Check(Status.GOOD, "Wi-Fi low latency mode", "Supported: power saving on Wi-Fi is turned off while you stream.")
-		else
-			Check(Status.INFO, "Wi-Fi low latency mode",
-				"Not supported by this device, so TS5 uses the high performance Wi-Fi mode and keeps Wi-Fi awake itself.")
 	}
 
 	// ── Display ──────────────────────────────────────────────────────────────────────────────
