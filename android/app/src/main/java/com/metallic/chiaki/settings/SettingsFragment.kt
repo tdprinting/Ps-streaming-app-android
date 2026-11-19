@@ -58,6 +58,7 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 		preferences.lowLatencyAudioKey -> preferences.lowLatencyAudio
 		preferences.bigCoresKey -> preferences.bigCores
 		preferences.frontBufferKey -> preferences.frontBuffer
+		preferences.directInputKey -> preferences.directInput
 		else -> defValue
 	}
 
@@ -84,6 +85,7 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 			preferences.lowLatencyAudioKey -> preferences.lowLatencyAudio = value
 			preferences.bigCoresKey -> preferences.bigCores = value
 			preferences.frontBufferKey -> preferences.frontBuffer = value
+			preferences.directInputKey -> preferences.directInput = value
 		}
 	}
 

@@ -162,6 +162,12 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getBoolean(bigCoresKey, true)
 		set(value) { sharedPreferences.edit().putBoolean(bigCoresKey, value).apply() }
 
+	/** Hayai, experimental, root: read the built-in gamepad from /dev/input directly, see RootInput */
+	val directInputKey get() = "latency_direct_input"
+	var directInput
+		get() = sharedPreferences.getBoolean(directInputKey, false)
+		set(value) { sharedPreferences.edit().putBoolean(directInputKey, value).apply() }
+
 	/**
 	 * Hayai, experimental: draw each frame straight into the buffer the display is scanning out
 	 * (front buffer rendering), skipping the wait for the next refresh and the compositor. Tears.

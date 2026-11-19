@@ -51,7 +51,79 @@ class StreamInput(val context: Context, val preferences: Preferences)
 		if(motionControllerState.r2State > 0U)
 			controllerState.r2State = motionControllerState.r2State
 
-		return controllerState or touchControllerState
+		val merged = controllerState or touchControllerState
+		// Hayai direct input: the built-in gamepad read straight from the kernel
+		return rawControllerState?.let { merged or it } ?: merged
+	}
+
+	/** Hayai: the latest state from [RootInput], or null when direct input isn't running */
+	@Volatile private var rawControllerState: ControllerState? = null
+	/** Hayai: the name of the device [RootInput] reads, whose events from Android are ignored */
+	@Volatile var rawDeviceName: String? = null
+		private set
+	private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+	/** Hayai: called on the direct input thread with each complete report from the gamepad */
+	fun setRawControllerState(state: ControllerState)
+	{
+		rawControllerState = state
+		val sent = sendControllerState()
+		val comboHeld = sent.buttons and MENU_COMBO == MENU_COMBO
+		if(comboHeld && !menuComboActive)
+			mainHandler.post { menuComboCallback?.invoke() }
+		menuComboActive = comboHeld
+	}
+
+	fun setRawDevice(name: String?)
+	{
+		rawDeviceName = name
+		if(name == null)
+		{
+			rawControllerState = null
+			sendControllerState()
+		}
+	}
+
+	/** Hayai: events from the device direct input reads are already handled, except Back */
+	private fun handledByRawInput(event: InputEvent): Boolean
+	{
+		val name = rawDeviceName ?: return false
+		if(event is KeyEvent && event.keyCode == KeyEvent.KEYCODE_BACK)
+			return false
+		val source = event.source
+		if(source and InputDevice.SOURCE_GAMEPAD != InputDevice.SOURCE_GAMEPAD
+			&& source and InputDevice.SOURCE_JOYSTICK != InputDevice.SOURCE_JOYSTICK
+			&& source and InputDevice.SOURCE_DPAD != InputDevice.SOURCE_DPAD)
+			return false
+		return InputDevice.getDevice(event.deviceId)?.name == name
+	}
+
+	// Hayai: how long controller events take from the kernel to this app, through Android
+	private var ageSumMs = 0L
+	private var ageCount = 0
+	private var ageMaxMs = 0L
+
+	private fun recordAge(event: InputEvent)
+	{
+		val age = android.os.SystemClock.uptimeMillis() - event.eventTime
+		if(age < 0 || age > 1000)
+			return
+		ageSumMs += age
+		ageCount++
+		if(age > ageMaxMs)
+			ageMaxMs = age
+	}
+
+	/** Hayai: average and maximum delay of controller events through Android, in ms, since the last call */
+	fun takeInputAge(): Pair<Float, Float>?
+	{
+		if(ageCount == 0)
+			return null
+		val result = Pair(ageSumMs.toFloat() / ageCount, ageMaxMs.toFloat())
+		ageSumMs = 0
+		ageCount = 0
+		ageMaxMs = 0
+		return result
 	}
 
 	private val sensorControllerState = ControllerState() // from Motion Sensors
@@ -323,6 +395,10 @@ class StreamInput(val context: Context, val preferences: Preferences)
 		if(event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP)
 			return false
 
+		if(handledByRawInput(event))
+			return true
+		recordAge(event)
+
 		val keyCode = event.keyCode
 		val action = event.action == KeyEvent.ACTION_DOWN
 		val profile = inputProfile(event.deviceId)
@@ -509,6 +585,9 @@ class StreamInput(val context: Context, val preferences: Preferences)
 			return onTouchpadEvent(event)
 		if(event.source and InputDevice.SOURCE_CLASS_JOYSTICK != InputDevice.SOURCE_CLASS_JOYSTICK)
 			return false
+		if(handledByRawInput(event))
+			return true
+		recordAge(event)
 		fun Float.signedAxis() = (this.coerceIn(-1.0f, 1.0f) * Short.MAX_VALUE).toInt().toShort()
 		fun Float.unsignedAxis() = (this.coerceIn(0.0f, 1.0f) * UByte.MAX_VALUE.toFloat()).toUInt().toUByte()
 

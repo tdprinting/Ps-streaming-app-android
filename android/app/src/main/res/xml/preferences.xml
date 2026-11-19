@@ -213,6 +213,12 @@
             app:icon="@drawable/ic_fps" />
 
         <SwitchPreference
+            app:key="latency_direct_input"
+            app:title="@string/preferences_direct_input_title"
+            app:summary="@string/preferences_direct_input_summary"
+            app:icon="@drawable/ic_fps" />
+
+        <SwitchPreference
             app:key="latency_front_buffer"
             app:title="@string/preferences_front_buffer_title"
             app:summary="@string/preferences_front_buffer_summary"

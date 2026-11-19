@@ -511,9 +511,58 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		updateSecondScreen()
 	}
 
+	/** Hayai direct input, see [RootInput] */
+	private var rootInput: RootInput? = null
+	private var rootInputStarting: Thread? = null
+
+	private fun startDirectInput()
+	{
+		if(!Preferences(this).directInput || rootInput != null || rootInputStarting != null)
+			return
+		val input = viewModel.input
+		rootInputStarting = Thread {
+			val device = RootInput.findGamepad()
+			if(device == null)
+			{
+				runOnUiThread {
+					rootInputStarting = null
+					android.widget.Toast.makeText(this, R.string.direct_input_unavailable, android.widget.Toast.LENGTH_LONG).show()
+				}
+				return@Thread
+			}
+			// The same controller's button swap and dead zone as through Android
+			val androidDevice = InputDevice.getDeviceIds().asSequence()
+				.mapNotNull { InputDevice.getDevice(it) }
+				.firstOrNull { it.name == device.name }
+			val profile = ControllerProfiles(this).profile(androidDevice?.descriptor)
+			val started = RootInput.start(device, profile.swapFaceButtons, profile.stickDeadZone / 100f) {
+				input.setRawControllerState(it)
+			}
+			runOnUiThread {
+				rootInputStarting = null
+				if(started == null || isFinishing)
+				{
+					started?.stop()
+					return@runOnUiThread
+				}
+				rootInput = started
+				input.setRawDevice(device.name)
+				viewModel.session.logInfo("Direct input from ${device.path} (${device.name})")
+			}
+		}.also { it.start() }
+	}
+
+	private fun stopDirectInput()
+	{
+		rootInput?.stop()
+		rootInput = null
+		viewModel.input.setRawDevice(null)
+	}
+
 	override fun onResume()
 	{
 		super.onResume()
+		startDirectInput()
 		hideSystemUI()
 		(getSystemService(INPUT_SERVICE) as InputManager).registerInputDeviceListener(inputDeviceListener, null)
 		viewModel.input.menuComboCallback = { showStreamMenu() }
@@ -541,6 +590,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 	override fun onPause()
 	{
 		super.onPause()
+		stopDirectInput()
 		viewModel.input.menuComboCallback = null
 		(getSystemService(INPUT_SERVICE) as InputManager).unregisterInputDeviceListener(inputDeviceListener)
 	}
@@ -753,6 +803,8 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			format(R.string.stream_stats_audio,
 				getString(if(stats.audioExclusive) R.string.stream_stats_audio_exclusive else R.string.stream_stats_audio_shared),
 				stats.audioDeviceBufferMs),
+			(rootInput?.takeInputAge()?.let { (avg, max) -> format(R.string.stream_stats_input_direct, avg, max) }
+				?: viewModel.input.takeInputAge()?.let { (avg, max) -> format(R.string.stream_stats_input_android, avg, max) }),
 			if(isHdrStream())
 				format(R.string.stream_stats_hdr, getString(
 					if(displayReportsHdr10()) R.string.stream_stats_hdr_on else R.string.stream_stats_hdr_tonemapped))

@@ -454,6 +454,11 @@
     <string name="stream_stats_hdr_on">on, display reports HDR10</string>
     <string name="stream_stats_hdr_tonemapped">on, but the display doesn\'t report HDR10, so Android tone maps it</string>
     <string name="stream_hdr_disables_shaders">HDR streams skip debanding, super resolution and tearing mode, which draw in 8-bit color</string>
+    <string name="preferences_direct_input_title">Direct controller input (experimental, root)</string>
+    <string name="preferences_direct_input_summary">Reads the built-in controller straight from the kernel, skipping Android\'s input system. Needs a rooted device and asks for root access. Button remapping doesn\'t apply.</string>
+    <string name="direct_input_unavailable">Direct controller input needs root access and a gamepad. Using Android\'s input instead.</string>
+    <string name="stream_stats_input_android" translatable="false">Input: controller → app %1$.1f ms, at most %2$.0f ms (through Android)</string>
+    <string name="stream_stats_input_direct" translatable="false">Input: controller → console %1$.2f ms, at most %2$.2f ms (direct)</string>
     <string name="stream_stats_latency" translatable="false">Decoder: %1$s · %2$d stale frames skipped · display %3$.0f Hz</string>
     <string name="stream_stats_decoder_snapdragon">Snapdragon low latency</string>
     <string name="stream_stats_decoder_low_latency">low latency</string>
