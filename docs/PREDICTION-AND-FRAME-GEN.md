@@ -46,7 +46,10 @@ The Snapdragon 8 Gen 2's Adreno 740 does have Qualcomm's Frame Motion Engine. Bu
 | **Exclusive (MMAP) audio, 2-burst buffer** | Audio mixer and buffer | **Done (v0.2)** |
 | DSCP EF on stream packets | Wi-Fi airtime contention for input | **Done (v0.2)** |
 | Fast cores only for hot threads | Scheduling and wake-up on little cores | **Done (v0.2)** |
-| Direct evdev input (root) | Android input stack | Planned |
+| Direct evdev input (root) | Android input stack | Experimental (v0.3) |
+| **Redundant input packets** (GGPO-style) | Lost Wi-Fi packets: ~2 ms instead of "until your next input" | **Done (v0.4)** |
+| **ADPF CPU hints** | Slow clock ramp-up on bursty work | **Done (v0.4)** |
+| **4 MB socket buffer, burst reads** | Kernel packet drops and per-packet wake-ups | **Done (v0.4)** |
 
 ## Sources
 - Cloud gaming lag compensation: Springer, *Lag Compensation for First-Person Shooter Games in Cloud Gaming*; ResearchGate, *Increasing Player Performance and Game Experience in High Latency Systems*; US patents 11601670 / 11503332 (player input motion compensation, which needs server motion vectors)

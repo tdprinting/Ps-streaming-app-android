@@ -77,3 +77,34 @@ Unbuffered dispatch removes the biggest input delay Android adds, the wait for v
 3. Map `BTN_*` / `ABS_*` codes to `ChiakiControllerState` (axis ranges from `EVIOCGABS`) and call `chiaki_session_set_controller_state` directly. The JVM is never involved.
 
 This would likely save another 1–3 ms and remove jitter from the UI thread. It isn't built yet, because it needs testing on a real rooted Odin 2 Portal to get the device name and axis mapping right. See `ROADMAP.md`.
+
+## v0.4: input redundancy, CPU hints and the network path
+
+### Redundant input
+Every input event (button press or release, trigger, touchpad) goes to the console in a "history" packet. Each packet carries the newest events and the number of the newest one, and the console applies only events it hasn't seen yet. Momiji's copy of the library sent each packet **once**. If Wi-Fi lost it, the console didn't see the press until your *next* input, and a lost release could leave a button held.
+
+TS5 now sends the newest packet again, unchanged, **2 and 6 ms** later, then 20, 50, 100 and 200 ms later. If the first copy arrived, the console ignores the rest. If it was lost, the press arrives about 2 ms late instead of whenever you next touch the controller. This is the same idea fighting-game netcode (GGPO) uses with redundant inputs. It costs a few dozen bytes per input. Setting: *Redundant input* (on).
+
+### CPU clock hints (ADPF)
+Android's Performance Hint API (Android 13+) gets a session covering the stream's network, input, video and audio threads. Every frame's decode time is reported against a 4 ms target, so Android raises the clocks as soon as frames slow down. Without it, the governor can take ~200 ms to react to the stream's short bursts of work. It's loaded at runtime and skipped where unavailable. The log shows "Performance hint session for N stream threads".
+
+### Network path review
+| Found | Effect | Fix |
+|---|---|---|
+| Socket receive buffer was the 100 KB protocol window | Less than one keyframe at 40 Mbit/s. Any pause of the receive thread during a burst made the kernel silently drop packets → glitches, recovery frames, latency spikes | Asks for 4 MB (Linux caps it at `rmem_max`, the granted size is logged). The window advertised to the console is unchanged |
+| `select()` + `recv()` for every packet | Two system calls and a wake-up per packet, even mid-burst | Non-blocking read first; `select()` only when nothing is queued (stop pipe still checked every 64 packets) |
+| No way to see kernel drops | Buffer overruns were invisible | `SO_RXQ_OVFL` counter, shown in the stats overlay when non-zero |
+| Audio decoder waited up to 10 ms for a buffer on the receive thread | Video packets wait behind it | 2 ms at most |
+| Audio decoder returned holding its lock when no buffer was free (upstream bug) | Could deadlock the audio decoder | Fixed |
+| Socket priority | Input queued behind other apps' uploads on the device | `SO_PRIORITY` 6, plus DSCP EF |
+
+Already good, and kept as is:
+- Frames are handed to the decoder as soon as enough packets (data or FEC) arrive. There's no wait for the next frame.
+- Lost frames are reported to the console right away, so it recovers with a new reference.
+- The controller state goes out the moment it changes.
+
+### Researched and not used
+- **Partial-frame decoding** (`BUFFER_FLAG_PARTIAL_FRAME`): the decoder still waits for the whole frame before decoding, so nothing is gained.
+- **Tunneled playback**: a TV-box path where the hardware composer shows frames timed to the audio clock. It's built for film playback, not lowest-latency game frames, and Snapdragon phones generally don't offer it.
+- **Wi-Fi 7 MLO**: the Odin has Wi-Fi 7, but the eero 6E is Wi-Fi 6E, so multi-link isn't available.
+- **Busy polling** (`SO_BUSY_POLL`) and real-time scheduling (`SCHED_FIFO`) need privileges apps don't have.

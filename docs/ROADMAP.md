@@ -28,6 +28,13 @@
 - [x] PXPlay-style controller-only mode and stats hotkey
 - [x] Feature comparison (docs/FEATURE-COMPARISON.md)
 
+## Done (v0.4)
+- [x] Twisting particle ribbon background
+- [x] Redundant input packets (2 / 6 ms copies plus a safety tail)
+- [x] ADPF performance hint session for the stream threads
+- [x] Network path: 4 MB socket buffer, burst reads, kernel drop counter, socket priority
+- [x] Audio decoder: shorter wait, lock fix
+
 ## Next
 - [ ] **Test on the Odin 2 Portal**: confirm `c2.qti.*.low_latency` starts (see the log / statistics) and that the display stays at 120 Hz
 - [ ] Measure end to end delay with a 240 fps phone camera (button LED or on-screen counter) against Momiji and Sony's app, and record the results in `docs/LATENCY.md`
