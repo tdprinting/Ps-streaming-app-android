@@ -104,7 +104,8 @@ private class ChiakiNative
 		@JvmStatic external fun sessionGotoBed(ptr: Long): Int
 		@JvmStatic external fun sessionGetStats(ptr: Long, stats: FloatArray)
 		@JvmStatic external fun setLatencyOptions(skipStaleFrames: Boolean, snapdragonTuning: Boolean,
-			snapdragonEarlyOutput: Boolean, lowLatencyAudio: Boolean, bigCores: Boolean)
+			snapdragonEarlyOutput: Boolean, lowLatencyAudio: Boolean, bigCores: Boolean, keepaliveMs: Int)
+		@JvmStatic external fun sessionGetHealth(ptr: Long, health: FloatArray)
 		@JvmStatic external fun sessionLogInfo(ptr: Long, text: String)
 		@JvmStatic external fun holepunchListDevices(result: CreateResult, token: String, ps5: Boolean): Array<HolepunchDevice>?
 		@JvmStatic external fun holepunchCreate(token: String, logFile: String?, logVerbose: Boolean): Long
@@ -507,8 +508,8 @@ data class StreamStats(
 object LatencyOptions
 {
 	fun apply(skipStaleFrames: Boolean, snapdragonTuning: Boolean, snapdragonEarlyOutput: Boolean,
-		lowLatencyAudio: Boolean, bigCores: Boolean) =
-		ChiakiNative.setLatencyOptions(skipStaleFrames, snapdragonTuning, snapdragonEarlyOutput, lowLatencyAudio, bigCores)
+		lowLatencyAudio: Boolean, bigCores: Boolean, keepaliveMs: Int) =
+		ChiakiNative.setLatencyOptions(skipStaleFrames, snapdragonTuning, snapdragonEarlyOutput, lowLatencyAudio, bigCores, keepaliveMs)
 }
 
 /**
@@ -638,6 +639,14 @@ class Session(connectInfo: ConnectInfo, logFile: String?, logVerbose: Boolean,
 	fun logInfo(text: String)
 	{
 		withNative { ChiakiNative.sessionLogInfo(it, text) }
+	}
+
+	/** Hayai: packet loss (0 to 1) and the longest frame gap in ms since the last call, for the connection warning */
+	fun getHealth(): Pair<Float, Float>?
+	{
+		val health = FloatArray(2)
+		withNative { ChiakiNative.sessionGetHealth(it, health) } ?: return null
+		return Pair(health[0], health[1])
 	}
 
 	fun getStats(): StreamStats?

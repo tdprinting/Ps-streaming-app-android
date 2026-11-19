@@ -5,6 +5,17 @@
 #define FEEDBACK_STATE_TIMEOUT_MIN_MS 8 // minimum time to wait between sending 2 packets
 #define FEEDBACK_STATE_TIMEOUT_MAX_MS 200 // maximum time to wait between sending 2 packets
 
+// Hayai: how long the sender waits before repeating the controller state when nothing changes.
+// A short interval keeps a packet going up every few ms, which stops Wi-Fi from dozing between
+// inputs and then delaying the next one (Artemis' "prevent packet loss" does the same with empty
+// packets every 20 ms).
+static volatile uint64_t feedback_state_keepalive_ms = FEEDBACK_STATE_TIMEOUT_MAX_MS;
+
+CHIAKI_EXPORT void chiaki_feedback_sender_set_keepalive_ms(uint64_t ms)
+{
+	feedback_state_keepalive_ms = ms ? ms : FEEDBACK_STATE_TIMEOUT_MAX_MS;
+}
+
 #define FEEDBACK_HISTORY_BUFFER_SIZE 0x10
 
 static void *feedback_sender_thread_func(void *user);
@@ -253,9 +264,10 @@ static void *feedback_sender_thread_func(void *user)
 	if(err != CHIAKI_ERR_SUCCESS)
 		return NULL;
 
-	uint64_t next_timeout = FEEDBACK_STATE_TIMEOUT_MAX_MS;
+	uint64_t next_timeout = feedback_state_keepalive_ms;
 	while(true)
 	{
+		next_timeout = feedback_state_keepalive_ms;
 		err = chiaki_cond_timedwait_pred(&feedback_sender->state_cond, &feedback_sender->state_mutex, next_timeout, state_cond_check, feedback_sender);
 		if(err != CHIAKI_ERR_SUCCESS && err != CHIAKI_ERR_TIMEOUT)
 			break;

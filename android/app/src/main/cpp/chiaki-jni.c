@@ -186,6 +186,9 @@ typedef struct android_chiaki_session_t
 
 	// Packet counts at the last sessionGetStats(), for the loss since then
 	uint64_t stats_received, stats_lost;
+	// Hayai: the same for sessionGetHealth(), kept apart so the overlay and the warning don't
+	// reset each other's counts
+	uint64_t health_received, health_lost;
 } AndroidChiakiSession;
 
 /**
@@ -787,9 +790,33 @@ JNIEXPORT void JNICALL JNI_FCN(sessionGetStats)(JNIEnv *env, jobject obj, jlong 
 }
 
 /** Hayai latency options for decoders created from now on, see video-decoder.h */
-JNIEXPORT void JNICALL JNI_FCN(setLatencyOptions)(JNIEnv *env, jobject obj, jboolean skip_stale_frames, jboolean snapdragon_tuning,
-		jboolean snapdragon_early_output, jboolean low_latency_audio, jboolean big_cores)
+/**
+ * Hayai, for the poor connection warning (as Moonlight shows): packet loss since the last call
+ * (0 to 1) in [0] and the longest gap between video frames since the last call, in ms, in [1]
+ */
+JNIEXPORT void JNICALL JNI_FCN(sessionGetHealth)(JNIEnv *env, jobject obj, jlong ptr, jfloatArray health_array)
 {
+	AndroidChiakiSession *session = (AndroidChiakiSession *)ptr;
+	ChiakiCongestionControl *congestion = &session->session.stream_connection.congestion_control;
+	uint64_t received = __atomic_load_n(&congestion->received_total, __ATOMIC_RELAXED);
+	uint64_t lost = __atomic_load_n(&congestion->lost_total, __ATOMIC_RELAXED);
+	if(received < session->health_received || lost < session->health_lost)
+		session->health_received = session->health_lost = 0;
+	uint64_t received_new = received - session->health_received;
+	uint64_t lost_new = lost - session->health_lost;
+	session->health_received = received;
+	session->health_lost = lost;
+	jfloat health[2] = {
+		received_new + lost_new > 0 ? (jfloat)lost_new / (jfloat)(received_new + lost_new) : 0.0f,
+		(jfloat)(__atomic_exchange_n(&session->video_decoder.gap_max_health_us, 0, __ATOMIC_RELAXED) / 1000.0)
+	};
+	E->SetFloatArrayRegion(env, health_array, 0, 2, health);
+}
+
+JNIEXPORT void JNICALL JNI_FCN(setLatencyOptions)(JNIEnv *env, jobject obj, jboolean skip_stale_frames, jboolean snapdragon_tuning,
+		jboolean snapdragon_early_output, jboolean low_latency_audio, jboolean big_cores, jint keepalive_ms)
+{
+	chiaki_feedback_sender_set_keepalive_ms((uint64_t)(keepalive_ms > 0 ? keepalive_ms : 0));
 	android_chiaki_video_decoder_set_latency_options(skip_stale_frames, snapdragon_tuning, snapdragon_early_output);
 	android_chiaki_audio_output_set_low_latency(low_latency_audio);
 	chiaki_thread_set_prefer_big_cores(big_cores);

@@ -459,10 +459,28 @@
     <string name="direct_input_unavailable">Direct controller input needs root access and a gamepad. Using Android\'s input instead.</string>
     <string name="stream_stats_input_android" translatable="false">Input: controller → app %1$.1f ms, at most %2$.0f ms (through Android)</string>
     <string name="stream_stats_input_direct" translatable="false">Input: controller → console %1$.2f ms, at most %2$.2f ms (direct)</string>
+    <string name="preferences_keep_wifi_awake_title">Keep Wi-Fi awake</string>
+    <string name="preferences_keep_wifi_awake_summary">Sends the controller state every 20 ms even when nothing moves, so Wi-Fi never naps between your inputs</string>
+    <string name="preferences_connection_warnings_title">Connection warnings</string>
+    <string name="preferences_connection_warnings_summary">Shows a small notice while packets are being lost or frames arrive late</string>
+    <string name="stream_connection_warning">Unstable connection</string>
     <string name="stream_stats_latency" translatable="false">Decoder: %1$s · %2$d stale frames skipped · display %3$.0f Hz</string>
     <string name="stream_stats_decoder_snapdragon">Snapdragon low latency</string>
     <string name="stream_stats_decoder_low_latency">low latency</string>
     <string name="stream_stats_decoder_plain">standard</string>
+    <string name="preferences_frame_pacing_title">Frame pacing</string>
+    <string-array name="preferences_frame_pacing_entries">
+        <item>Lowest latency (120 Hz, skip late frames)</item>
+        <item>Balanced (60 Hz, skip late frames)</item>
+        <item>Smoothest (60 Hz, show every frame)</item>
+        <item>Custom</item>
+    </string-array>
+    <string-array name="preferences_frame_pacing_values" translatable="false">
+        <item>latency</item>
+        <item>balanced</item>
+        <item>smooth</item>
+        <item>custom</item>
+    </string-array>
     <string-array name="preferences_refresh_mode_entries">
         <item>@string/preferences_refresh_mode_max</item>
         <item>@string/preferences_refresh_mode_match</item>

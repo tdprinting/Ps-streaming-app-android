@@ -168,6 +168,14 @@
         app:key="category_latency"
         app:title="@string/preferences_category_title_latency">
         <ListPreference
+            app:key="latency_frame_pacing"
+            app:title="@string/preferences_frame_pacing_title"
+            app:entries="@array/preferences_frame_pacing_entries"
+            app:entryValues="@array/preferences_frame_pacing_values"
+            app:summary="%s"
+            app:icon="@drawable/ic_fps"/>
+
+        <ListPreference
             app:key="latency_refresh_mode"
             app:title="@string/preferences_refresh_mode_title"
             app:entries="@array/preferences_refresh_mode_entries"
@@ -210,6 +218,18 @@
             app:key="latency_big_cores"
             app:title="@string/preferences_big_cores_title"
             app:summary="@string/preferences_big_cores_summary"
+            app:icon="@drawable/ic_fps" />
+
+        <SwitchPreference
+            app:key="latency_keep_wifi_awake"
+            app:title="@string/preferences_keep_wifi_awake_title"
+            app:summary="@string/preferences_keep_wifi_awake_summary"
+            app:icon="@drawable/ic_fps" />
+
+        <SwitchPreference
+            app:key="stream_connection_warnings"
+            app:title="@string/preferences_connection_warnings_title"
+            app:summary="@string/preferences_connection_warnings_summary"
             app:icon="@drawable/ic_fps" />
 
         <SwitchPreference

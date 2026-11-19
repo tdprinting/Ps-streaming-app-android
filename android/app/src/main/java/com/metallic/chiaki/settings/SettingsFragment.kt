@@ -59,6 +59,8 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 		preferences.bigCoresKey -> preferences.bigCores
 		preferences.frontBufferKey -> preferences.frontBuffer
 		preferences.directInputKey -> preferences.directInput
+		preferences.keepWifiAwakeKey -> preferences.keepWifiAwake
+		preferences.connectionWarningsKey -> preferences.connectionWarnings
 		else -> defValue
 	}
 
@@ -86,6 +88,8 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 			preferences.bigCoresKey -> preferences.bigCores = value
 			preferences.frontBufferKey -> preferences.frontBuffer = value
 			preferences.directInputKey -> preferences.directInput = value
+			preferences.keepWifiAwakeKey -> preferences.keepWifiAwake = value
+			preferences.connectionWarningsKey -> preferences.connectionWarnings = value
 		}
 	}
 
@@ -101,6 +105,7 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 		key == preferences.bitrateKey -> preferences.bitrate?.toString() ?: ""
 		key == preferences.codecKey -> preferences.codec.value
 		key == preferences.refreshModeKey -> preferences.refreshMode.value
+		key == preferences.framePacingKey -> preferences.framePacing.value
 		else -> defValue
 	}
 
@@ -122,6 +127,8 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 			key == preferences.bitrateKey -> preferences.bitrate = value?.toIntOrNull()
 			key == preferences.refreshModeKey ->
 				preferences.refreshMode = Preferences.RefreshMode.fromValue(value) ?: return
+			key == preferences.framePacingKey ->
+				preferences.framePacing = Preferences.FramePacing.fromValue(value) ?: return
 			key == preferences.codecKey ->
 			{
 				val codec = Preferences.Codec.values().firstOrNull { it.value == value } ?: return

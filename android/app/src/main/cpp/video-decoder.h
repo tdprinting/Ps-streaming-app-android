@@ -48,7 +48,8 @@ typedef struct android_chiaki_video_decoder_t {
   uint64_t last_sample_us;
   uint32_t gap_max_stats_us;
   uint32_t gap_max_log_us;
-
+  // Hayai: the same for the poor connection warning
+  uint32_t gap_max_health_us;
   // Hayai: decoded frames that were skipped because a newer one was already
   // decoded. Read from other threads with __atomic_load_n.
   uint32_t frames_skipped_stale;

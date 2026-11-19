@@ -62,6 +62,8 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 {
 	companion object
 	{
+		/** Hayai: how often the connection warning checks the stream */
+		private const val CONNECTION_CHECK_MS = 1000L
 		private const val TAG = "StreamActivity"
 		private const val HINT_SHORT_MS = 2500L
 		private const val HINT_LONG_MS = 4000L
@@ -97,7 +99,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		// Hayai: read by the native video decoder when it is created for this stream
 		Preferences(this).let {
 			LatencyOptions.apply(it.skipStaleFrames, it.snapdragonTuning, it.snapdragonEarlyOutput,
-				it.lowLatencyAudio, it.bigCores)
+				it.lowLatencyAudio, it.bigCores, if(it.keepWifiAwake) 20 else 0)
 		}
 
 		viewModel = ViewModelProvider(this, viewModelFactory {
@@ -505,6 +507,8 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		if(Preferences(this).streamStatsEnabled)
 			setStatsVisible(true)
 		statsHandler.post(checkBatteryRunnable)
+		if(Preferences(this).connectionWarnings)
+			statsHandler.postDelayed(checkConnectionRunnable, CONNECTION_CHECK_MS)
 		startStreamCheck()
 		getSystemService(DisplayManager::class.java)?.registerDisplayListener(displayListener, Handler(Looper.getMainLooper()))
 		started = true
@@ -606,6 +610,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		rumble?.stop()
 		statsHandler.removeCallbacks(updateStatsRunnable)
 		statsHandler.removeCallbacks(checkBatteryRunnable)
+		statsHandler.removeCallbacks(checkConnectionRunnable)
 		stopStreamCheck()
 		viewModel.session.pause()
 		countPlayTime()
@@ -734,6 +739,31 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 	}
 
 	private val statsHandler = Handler(Looper.getMainLooper())
+
+	// Hayai: Moonlight-style poor connection warning. Shown after two bad seconds in a row (over 5%
+	// packet loss, or frames 100 ms or more apart), hidden after three good ones.
+	private var badConnectionSeconds = 0
+	private var goodConnectionSeconds = 0
+	private val checkConnectionRunnable: Runnable = object: Runnable
+	{
+		override fun run()
+		{
+			viewModel.session.health()?.let { (loss, gapMs) ->
+				val bad = loss > 0.05f || gapMs >= 100f
+				if(bad) { badConnectionSeconds++; goodConnectionSeconds = 0 }
+				else { goodConnectionSeconds++; badConnectionSeconds = 0 }
+				val warning = binding.connectionWarning
+				if(badConnectionSeconds >= 2 && !warning.isVisible)
+				{
+					warning.isVisible = true
+					warning.animate().alpha(1f).setDuration(200).start()
+				}
+				else if(goodConnectionSeconds >= 3 && warning.isVisible)
+					warning.animate().alpha(0f).setDuration(400).withEndAction { warning.isGone = true }.start()
+			}
+			statsHandler.postDelayed(this, CONNECTION_CHECK_MS)
+		}
+	}
 	private var statsLastFrames = -1L
 	private var statsLastShown = 0L
 	private var statsLastTimeMs = 0L

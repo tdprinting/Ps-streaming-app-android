@@ -75,6 +75,7 @@ android_chiaki_video_decoder_init(AndroidChiakiVideoDecoder *decoder,
   decoder->last_sample_us = 0;
   decoder->gap_max_stats_us = 0;
   decoder->gap_max_log_us = 0;
+  decoder->gap_max_health_us = 0;
   decoder->frames_skipped_stale = 0;
   decoder->latency_tier = LATENCY_TIER_PLAIN;
   return chiaki_mutex_init(&decoder->codec_mutex, false);
@@ -335,6 +336,7 @@ bool android_chiaki_video_decoder_video_sample(uint8_t *buf, size_t buf_size,
     uint32_t gap_us = gap > UINT32_MAX ? UINT32_MAX : (uint32_t)gap;
     raise_gap_max(&decoder->gap_max_stats_us, gap_us);
     raise_gap_max(&decoder->gap_max_log_us, gap_us);
+    raise_gap_max(&decoder->gap_max_health_us, gap_us);
   }
   decoder->last_sample_us = now;
   chiaki_mutex_lock(&decoder->codec_mutex);

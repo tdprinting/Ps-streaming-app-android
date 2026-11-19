@@ -31,6 +31,12 @@ typedef struct chiaki_feedback_sender_t
 	ChiakiCond state_cond;
 } ChiakiFeedbackSender;
 
+/**
+ * Hayai: repeat the controller state every ms milliseconds while it doesn't change, 0 for the
+ * default (200 ms). Applies to all senders, from their next wait.
+ */
+CHIAKI_EXPORT void chiaki_feedback_sender_set_keepalive_ms(uint64_t ms);
+
 CHIAKI_EXPORT ChiakiErrorCode chiaki_feedback_sender_init(ChiakiFeedbackSender *feedback_sender, ChiakiTakion *takion);
 CHIAKI_EXPORT void chiaki_feedback_sender_fini(ChiakiFeedbackSender *feedback_sender);
 CHIAKI_EXPORT ChiakiErrorCode chiaki_feedback_sender_set_controller_state(ChiakiFeedbackSender *feedback_sender, ChiakiControllerState *state);

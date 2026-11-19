@@ -121,6 +121,37 @@ class Preferences(context: Context)
 		}
 	}
 
+	/**
+	 * Hayai: Moonlight-style frame pacing presets over [refreshMode] and [skipStaleFrames].
+	 * Lowest latency: fastest refresh, late frames skipped. Balanced: 60 Hz, late frames skipped.
+	 * Smoothest: 60 Hz, every frame shown once in order, even late ones.
+	 */
+	enum class FramePacing(val value: String)
+	{
+		LOWEST_LATENCY("latency"), BALANCED("balanced"), SMOOTHEST("smooth"), CUSTOM("custom");
+		companion object { fun fromValue(value: String?) = values().firstOrNull { it.value == value } }
+	}
+
+	val framePacingKey get() = "latency_frame_pacing"
+	var framePacing: FramePacing
+		get() = when
+		{
+			refreshMode == RefreshMode.MAX && skipStaleFrames -> FramePacing.LOWEST_LATENCY
+			refreshMode == RefreshMode.MATCH && skipStaleFrames -> FramePacing.BALANCED
+			refreshMode == RefreshMode.MATCH && !skipStaleFrames -> FramePacing.SMOOTHEST
+			else -> FramePacing.CUSTOM
+		}
+		set(value)
+		{
+			when(value)
+			{
+				FramePacing.LOWEST_LATENCY -> { refreshMode = RefreshMode.MAX; skipStaleFrames = true }
+				FramePacing.BALANCED -> { refreshMode = RefreshMode.MATCH; skipStaleFrames = true }
+				FramePacing.SMOOTHEST -> { refreshMode = RefreshMode.MATCH; skipStaleFrames = false }
+				FramePacing.CUSTOM -> {}
+			}
+		}
+
 	val refreshModeKey get() = "latency_refresh_mode"
 	var refreshMode: RefreshMode
 		get() = RefreshMode.fromValue(sharedPreferences.getString(refreshModeKey, null)) ?: RefreshMode.MAX
@@ -161,6 +192,18 @@ class Preferences(context: Context)
 	var bigCores
 		get() = sharedPreferences.getBoolean(bigCoresKey, true)
 		set(value) { sharedPreferences.edit().putBoolean(bigCoresKey, value).apply() }
+
+	/** Hayai: repeat the controller state every 20 ms so Wi-Fi never dozes between inputs */
+	val keepWifiAwakeKey get() = "latency_keep_wifi_awake"
+	var keepWifiAwake
+		get() = sharedPreferences.getBoolean(keepWifiAwakeKey, true)
+		set(value) { sharedPreferences.edit().putBoolean(keepWifiAwakeKey, value).apply() }
+
+	/** Hayai: Moonlight-style warning when packets are lost or frames arrive late */
+	val connectionWarningsKey get() = "stream_connection_warnings"
+	var connectionWarnings
+		get() = sharedPreferences.getBoolean(connectionWarningsKey, true)
+		set(value) { sharedPreferences.edit().putBoolean(connectionWarningsKey, value).apply() }
 
 	/** Hayai, experimental, root: read the built-in gamepad from /dev/input directly, see RootInput */
 	val directInputKey get() = "latency_direct_input"

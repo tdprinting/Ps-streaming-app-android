@@ -32,6 +32,24 @@
             app:drawablePressed="@android:color/transparent" />
     </com.metallic.chiaki.stream.AspectRatioFrameLayout>
 
+    <!-- Hayai: poor connection warning, like Moonlight's -->
+    <TextView
+        android:id="@+id/connectionWarning"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_margin="12dp"
+        android:paddingStart="12dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="6dp"
+        android:background="@drawable/stream_stats_background"
+        android:textColor="#FFFFD54F"
+        android:textSize="13sp"
+        android:alpha="0"
+        android:visibility="gone"
+        android:text="@string/stream_connection_warning" />
+
     <ProgressBar
         android:id="@+id/progressBar"
         android:layout_width="wrap_content"
