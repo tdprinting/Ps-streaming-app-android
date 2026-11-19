@@ -41,7 +41,7 @@ Checked November 2026. Moonlight streams from a PC running Sunshine; PXPlay and 
 | Button mapping, dead zone | ✓ | ✓ | ✓ per controller (from Momiji) |
 | Gyro / motion | ✓ | ✓ | ✓ device and DualSense gyro |
 | Rumble, DualSense haptics and triggers | rumble | D-Sense support | ✓ incl. haptics over USB (from Momiji) |
-| On-screen controls | ✓ | ✓ customizable | ✓ |
+| On-screen controls | ✓ | ✓ customizable | ✓ **layout editor**: move, resize, hide, opacity |
 | Touchscreen as touchpad | ✓ | ✓ gestures | ✓ |
 | Hotkeys | ✓ | ✓ | ✓ menu (L1+R1+Options+Create), stats (L1+R1+L3) |
 | Virtual controller / controller only | – | ✓ | ✓ **Controller only** |
@@ -53,5 +53,4 @@ Checked November 2026. Moonlight streams from a PC running Sunshine; PXPlay and 
 | Price | free | license key required | free, open source |
 
 ## Not done yet
-- Custom on-screen controller layout editor (PXPlay)
 - An HDR-capable shader path, so super resolution and debanding work with HDR

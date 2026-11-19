@@ -43,7 +43,7 @@
 - [ ] **Test on the Odin 2 Portal**: confirm `c2.qti.*.low_latency` starts (see the log / statistics) and that the display stays at 120 Hz
 - [ ] Measure end to end delay with a 240 fps phone camera (button LED or on-screen counter) against Momiji and Sony's app, and record the results in `docs/LATENCY.md`
 - [ ] Test direct input on a rooted Odin 2 Portal (button and axis mapping)
-- [ ] On-screen controller layout editor
+- [x] On-screen controller layout editor (stream menu → Edit layout)
 - [ ] ADPF performance hint session for the decode and input threads (Android 13 `APerformanceHint`)
 - [ ] Odin preset button: one tap for all latency settings plus the Max quality preset
 - [ ] Optional: the decoder's own frame-ready callback (async MediaCodec) in place of the blocking output thread
