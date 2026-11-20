@@ -109,3 +109,23 @@ jobs:
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           body: ${{ env.TS5_SIGNED != 'release' && 'Preview build signed with a throwaway key: a later release can''t update it in place, so uninstall this one first.' || '' }}
+
+      # A rolling prerelease of the newest main build, at a fixed address:
+      # https://github.com/tdprinting/Ps-streaming-app-android/releases/download/preview/TS5-Streaming-preview.apk
+      - name: Copy for the preview release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: cp out/*.apk out-preview.apk && mkdir -p preview && mv out-preview.apk preview/TS5-Streaming-preview.apk
+
+      - name: Publish the preview release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: preview
+          name: Preview (newest main build)
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          files: preview/TS5-Streaming-preview.apk
+          body: |
+            The newest build of main, ${{ env.TS5_VERSION_NAME }} (${{ github.sha }}). Replaced by every push.
+            Signed with: ${{ env.TS5_SIGNED }} key${{ env.TS5_SIGNED != 'release' && ' (throwaway: a later build can''t update it in place, uninstall first)' || '' }}.
