@@ -32,7 +32,7 @@
 
 ## TS5 Streaming
 
-1. Install the APK (from the latest GitHub Actions run, artifact *ts5-streaming-debug-apk*).
+1. Install the APK from the Releases page (or the latest GitHub Actions run, artifact *ts5-streaming-apk*). If an older debug build is installed, uninstall it first: it was signed with a different key.
 2. Open it, tap your PS5 and follow the registration steps.
 3. Settings → Stream → Quality: **Max** (default on AYN devices: 1080p60 HEVC, 40 Mbit/s).
 4. Settings → Latency: leave everything on (the default), with display refresh rate *Fastest*.

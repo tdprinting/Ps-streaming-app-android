@@ -42,14 +42,14 @@ Each one can be switched off in **Settings → Latency**. Remote Play itself is 
 
 ## Getting the APK
 
-Every push to `main` builds a debug APK in GitHub Actions: **Actions → Build APK → latest run → Artifacts → ts5-streaming-debug-apk**. Unzip it and install `app-fdroid-debug.apk` on the Odin. It installs alongside Momiji or Sony's app (app id `com.tdprinting.ts5`).
+Tagged versions are on the **Releases** page: download `TS5-Streaming-<version>.apk` and install it on the Odin. Every push to `main` also builds one: **Actions → Build APK → latest run → Artifacts → ts5-streaming-apk**. These are optimized release builds (native code at -O2, R8, not debuggable), signed with the release key from the `TS5_KEYSTORE_*` repository secrets, so each installs over the last. The app installs alongside Momiji or Sony's app (app id `com.tdprinting.ts5`). Pushing a `v*` tag publishes a GitHub Release.
 
 ## Building
 
 ```bash
 git clone --recursive https://github.com/tdprinting/Ps-streaming-app-android.git
 cd Ps-streaming-app-android/android
-./gradlew assembleFdroidDebug
+./gradlew assembleFdroidRelease   # or assembleFdroidDebug for debugging
 ```
 
 You need JDK 17, the Android SDK with NDK 26.1.10909125 and CMake 3.22.1, `protoc`, and the Python `protobuf` module (`sudo apt install protobuf-compiler python3-protobuf`).
