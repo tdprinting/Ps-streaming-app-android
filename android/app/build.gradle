@@ -30,8 +30,8 @@ android {
         minSdk 24
         targetSdk 36
         // TS5: CI numbers builds, so each one can install over the last
-        versionCode (System.getenv("TS5_VERSION_CODE") ?: "100").toInteger()
-        versionName System.getenv("TS5_VERSION_NAME") ?: "1.0.0"
+        versionCode = (System.getenv("TS5_VERSION_CODE") ?: "100").toInteger()
+        versionName = System.getenv("TS5_VERSION_NAME") ?: "1.0.0"
         externalNativeBuild {
             cmake {
                 // Reproducible builds: no build machine paths in the native code (e.g. from __FILE__),
