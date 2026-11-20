@@ -3,13 +3,19 @@ name: Build APK
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: write # to publish a GitHub Release for a v* tag
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      TS5_VERSION_CODE: ${{ 1000 + github.run_number }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,12 +41,69 @@ jobs:
         with:
           allow-checksums: e2b82129ab64751fd40437007bd2f7f2afb3c6e41a9198e628650b22d5824a14
 
-      - name: Build debug APK (fdroid flavor, arm64 is what the Odin 2 Portal needs)
+      - name: Version name
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "TS5_VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "TS5_VERSION_NAME=1.0.0-build.${{ github.run_number }}" >> "$GITHUB_ENV"
+          fi
+
+      # The release key comes from the repository's secrets, so every build installs over the last.
+      # Without them (a fork, or before they're added) a throwaway key is made: the APK installs,
+      # but the next one can't update it.
+      - name: Signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.TS5_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.TS5_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.TS5_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.TS5_KEY_PASSWORD }}
+        run: |
+          KS="$RUNNER_TEMP/ts5-release.jks"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$KS"
+            echo "TS5_SIGNED=release" >> "$GITHUB_ENV"
+          else
+            echo "::warning::TS5_KEYSTORE_BASE64 secret not set: signing with a throwaway key, so this APK can't be updated in place"
+            KEYSTORE_PASSWORD=throwaway; KEY_ALIAS=ts5; KEY_PASSWORD=throwaway
+            keytool -genkeypair -keystore "$KS" -alias ts5 -keyalg RSA -keysize 2048 -validity 365 \
+              -storepass throwaway -keypass throwaway -dname "CN=TS5 Streaming throwaway" -storetype PKCS12
+            echo "TS5_SIGNED=throwaway" >> "$GITHUB_ENV"
+          fi
+          {
+            echo "chiakiKeystore=$KS"
+            echo "chiakiKeystorePW=$KEYSTORE_PASSWORD"
+            echo "chiakiKeyAlias=$KEY_ALIAS"
+            echo "chiakiKeyPW=$KEY_PASSWORD"
+          } > android/local.properties
+
+      # Release: native code optimized (-O2), Kotlin/Java shrunk by R8 and not debuggable, which is
+      # what the stream should be measured with
+      - name: Build release APK (fdroid flavor)
         working-directory: android
-        run: ./gradlew --no-daemon assembleFdroidDebug
+        run: ./gradlew --no-daemon assembleFdroidRelease
+
+      - name: Name the APK
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/fdroid/release/*.apk "out/TS5-Streaming-$TS5_VERSION_NAME.apk"
+          ls -la out
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ts5-streaming-debug-apk
-          path: android/app/build/outputs/apk/fdroid/debug/*.apk
+          name: ts5-streaming-apk
+          path: out/*.apk
           if-no-files-found: error
+
+      - name: Refuse to publish a release signed with a throwaway key
+        if: startsWith(github.ref, 'refs/tags/v') && env.TS5_SIGNED != 'release'
+        run: |
+          echo "::error::Add the TS5_KEYSTORE_* secrets before tagging a release"
+          exit 1
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk
+          generate_release_notes: true
