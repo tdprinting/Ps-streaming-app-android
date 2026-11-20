@@ -94,8 +94,9 @@ jobs:
           path: out/*.apk
           if-no-files-found: error
 
+      # A preview tag (v1.0.0-preview.1) may go out with a throwaway key, marked as a prerelease
       - name: Refuse to publish a release signed with a throwaway key
-        if: startsWith(github.ref, 'refs/tags/v') && env.TS5_SIGNED != 'release'
+        if: startsWith(github.ref, 'refs/tags/v') && env.TS5_SIGNED != 'release' && !contains(github.ref_name, '-')
         run: |
           echo "::error::Add the TS5_KEYSTORE_* secrets before tagging a release"
           exit 1
@@ -106,3 +107,5 @@ jobs:
         with:
           files: out/*.apk
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: ${{ env.TS5_SIGNED != 'release' && 'Preview build signed with a throwaway key: a later release can''t update it in place, so uninstall this one first.' || '' }}
