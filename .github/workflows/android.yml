@@ -108,7 +108,6 @@ jobs:
           files: out/*.apk
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
-          body: ${{ env.TS5_SIGNED != 'release' && 'Preview build signed with a throwaway key: a later release can''t update it in place, so uninstall this one first.' || '' }}
 
       # A rolling prerelease of the newest main build, at a fixed address:
       # https://github.com/tdprinting/Ps-streaming-app-android/releases/download/preview/TS5-Streaming-preview.apk
